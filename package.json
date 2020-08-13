@@ -1,19 +1,20 @@
 {
-  "name": "scraper",
+  "name": "simple-scraps",
   "version": "1.0.0",
-  "description": "",
+  "description": "Extract structured (JSON) data from public web pages",
   "main": "index.js",
   "dependencies": {
     "@sindresorhus/slugify": "^1.1.0",
     "mkdirp": "^1.0.4",
     "puppeteer": "^5.2.1",
-    "url-parse": "^1.4.7",
-    "worker-farm": "^1.7.0"
+    "url-parse": "^1.4.7"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "standard": "*"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "standard"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "Paulmicha",
+  "license": "MIT"
 }
