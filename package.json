@@ -1,0 +1,19 @@
+{
+  "name": "scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "@sindresorhus/slugify": "^1.1.0",
+    "mkdirp": "^1.0.4",
+    "puppeteer": "^5.2.1",
+    "url-parse": "^1.4.7",
+    "worker-farm": "^1.7.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
