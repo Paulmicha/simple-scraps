@@ -18,12 +18,12 @@ At this stage, this repo contains evaluations of potential implementations to ex
 ## Initial considerations  (abandoned)
 
 All-in-one solutions (~ "larger" projects) :
-- (OpenScraper)[https://github.com/entrepreneur-interet-general/OpenScraper]
-- (headless-chrome-crawler)[https://github.com/yujiosaka/headless-chrome-crawler]
+- [OpenScraper](https://github.com/entrepreneur-interet-general/OpenScraper)
+- [headless-chrome-crawler](https://github.com/yujiosaka/headless-chrome-crawler)
 
 Building blocks to "roll your own" :
-- (node-worker-farm)[https://github.com/rvagg/node-worker-farm]
-- (bee-queue)[https://github.com/bee-queue/bee-queue]
+- [node-worker-farm](https://github.com/rvagg/node-worker-farm)
+- [bee-queue](https://github.com/bee-queue/bee-queue)
 
 ## Current status
 
