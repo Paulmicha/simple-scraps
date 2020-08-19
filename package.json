@@ -5,15 +5,24 @@
   "main": "index.js",
   "dependencies": {
     "@sindresorhus/slugify": "^1.1.0",
+    "cash-dom": "^8.0.0",
     "mkdirp": "^1.0.4",
     "puppeteer": "^5.2.1",
     "url-parse": "^1.4.7"
   },
   "devDependencies": {
+    "@commitlint/cli": "^10.0.0",
+    "@commitlint/config-conventional": "^10.0.0",
+    "husky": "^4.2.5",
     "standard": "*"
   },
   "scripts": {
     "test": "standard"
+  },
+  "husky": {
+    "hooks": {
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
   },
   "author": "Paulmicha",
   "license": "MIT"

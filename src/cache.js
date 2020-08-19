@@ -17,7 +17,7 @@ const cacheGetFilePath = (url) => {
   }
   const pathParts = parsedUrl.pathname.split('/')
   const filePath = pathParts.map(part => slugify(part)).join('/')
-  return `cache/${parsedUrl.hostname + filePath}.html`
+  return `data/cache/${parsedUrl.hostname + filePath}.html`
 }
 
 /**
