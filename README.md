@@ -32,39 +32,23 @@ Borrows the concept of Drupal entities, roughly : a data model that can have 2 "
 Entities may have URLs (i.e. pages, articles, users, or even taxonomy terms), or not (i.e. config, blocks, menus).
 Entity types or bundles share the same **fields**.
 
-Differences in rendering for a single entity type or bundle can be implemented as **view modes**, i.e. `default` (full page), `teaser`, `card`, etc.
+Example content entities object structure (JSON output, see section *Content model and Structured Data Mapping* below) :
 
-## Expected implementation
-
-Given this example configuration input (overview) :
-
-```js
+```txt
 {
-  "start": [
-    {
-      "url": "https://www.chouette.net.br/blog",
-      "follow": [
-        {
-          // Defines initial crawling rules.
-        }
-      ]
-    }
-  ],
-  "content/*": {
-    // Defines extraction process overridable defaults for all content entities.
-  },
-  "content/blog": {
-    // Defines extraction process (and/or overrides) for "blog" content type.
-  },
-  "components": [
-    {
-      // Defines individual components constituting entities contents.
-    }
-  ]
+  "lang": "fr",                             ← ISO 639-1 language code
+  "title": "The main page title",           ← Should match page URL (slug)
+  "short_title": "Short page title",        ← [optional] used in menus, breadcrumb
+  "description": "Teaser text",             ← [optional] Used in <meta> tags (og:description)
+  "image": "media/2020/08/visual.jpg",      ← [optional] Used in <meta> tags (og:image)
+  "tags": [],                               ← [optional] Taxonomy terms entity references
+  "published": "2020-08-25T15:12:36.594Z",  ← [optional] ISO 8601 publication date
+  "uuid": "dd2aaa05-7d00-493c-9373-a0f695862850", ← [optional] For easier entity refs
+  "content": []                             ← [optional] Main page contents (see Rich content editing)
 }
 ```
 
-... the expected output would be :
+TODO [wip] config object format and resulting process is currently being sketched out. Meanwhile, the file structure looks like this :
 
 ```txt
 path/to/project/docroot/
@@ -85,8 +69,6 @@ path/to/project/docroot/
   ├── src/
   └── ...
 ```
-
-TODO [wip] config object format and resulting process is currently being sketched out.
 
 ## Crawling process
 
@@ -139,7 +121,8 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
     },
     {
       "selector": "main .region-content",
-      "extract": "components"
+      "extract": "components",
+      "as": "entity.content"
     }
   ],
   "content/blog": [
@@ -161,7 +144,7 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
       "selector": ".c-pimg",
       "extract": [
         {
-          // TODO [wip]
+          // TODO [wip] inner selectors to map to component props.
         }
       ],
       "to": "component/MediaGrid"
