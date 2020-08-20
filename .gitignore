@@ -13,6 +13,10 @@
 /data/tmp/*
 !/data/tmp/README.md
 
+# Code coverage tool (nyc).
+.nyc_output
+coverage
+
 # General exclusions.
 node_modules
 docker-runtime
