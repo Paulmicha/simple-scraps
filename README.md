@@ -20,12 +20,13 @@ path/to/project/docroot/
   │   │   └── www.chouette.net.br/
   │   ├── output/                     ← Extracted structured data
   │   │   └── www.chouette.net.br/
-  │   │       ├── blog/
-  │   │       │   ├── 02004e7b-ea2c-49d0-b050-dab13f0181a7.json
-  │   │       │   └── ...
-  │   │       └── page/
-  │   │           ├── dc49234b-53a7-452a-a2be-23e7121d3be1.json
-  │   │           └── ...
+  │   │       └── content/
+  │   │           ├── blog/
+  │   │           │   ├── 02004e7b-ea2c-49d0-b050-dab13f0181a7.json
+  │   │           │   └── ...
+  │   │           └── page/
+  │   │               ├── dc49234b-53a7-452a-a2be-23e7121d3be1.json
+  │   │               └── ...
   │   ├── sessions/                   ← Configuration (JSON files)
   │   └── ...
   ├── src/
@@ -110,7 +111,7 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
 
 ## Crawling process
 
-API reference shortcut : [puppeteer repo](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md))
+API reference shortcut : [puppeteer repo](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md)
 
 The configuration object contains "entry points", or "destinations". Its root keys are values that may be used in `to` keys (except when they contain wildcards).
 
@@ -120,7 +121,7 @@ The `start` key defines the initial URLs where links to individual content pages
 
 Borrows the concept of Drupal *entities*, which is essentially a data model that can have 2 "levels" when appropriate - i.e. **entity type** / **bundle** (~ *class* / *sub-class*), ex : `content` / `page`, `taxonomy_term` / `tag`, etc. Entity types or bundles share the same **fields**.
 
-Example content entities object structure - i.e. this is what the resulting extracted JSON output will look like, e.g. in files like `data/output/www.chouette.net.br/blog/02004e7b-ea2c-49d0-b050-dab13f0181a7.json` :
+Example content entities object structure - i.e. this is what the resulting extracted JSON output will look like, e.g. in files like `data/output/www.chouette.net.br/content/blog/02004e7b-ea2c-49d0-b050-dab13f0181a7.json` :
 
 ```txt
 {
