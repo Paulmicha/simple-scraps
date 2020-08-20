@@ -33,6 +33,35 @@ path/to/project/docroot/
   └── ...
 ```
 
+## Usage
+
+TODO [wip] for now, this is merely one way to try the prototype at this stage.
+
+In a terminal, from project docroot :
+
+```sh
+node ./scrap.js
+```
+
+Example script `./scrap.js` contents :
+
+```js
+const SimpleScraps = require('./src/Main')
+const config = require('./data/sessions/localhost.json')
+
+const scraps = new SimpleScraps(config)
+
+const launch = async () => {
+  await scraps.init()
+  await scraps.start()
+  await scraps.stop()
+}
+
+launch()
+```
+
+For the config file contents (`./data/sessions/localhost.json`), see below :
+
 ## Configuration (individual crawling sessions setup)
 
 TODO [wip] config object format and resulting process is currently being sketched out. Here's an example illustrating the current plan so far :
