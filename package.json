@@ -14,11 +14,12 @@
   "devDependencies": {
     "@commitlint/cli": "^10.0.0",
     "@commitlint/config-conventional": "^10.0.0",
+    "ava": "^3.11.1",
     "husky": "^4.2.5",
     "standard": "*"
   },
   "scripts": {
-    "test": "standard"
+    "test": "ava"
   },
   "husky": {
     "hooks": {

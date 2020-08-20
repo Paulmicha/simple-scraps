@@ -5,6 +5,7 @@
 class Queue {
   constructor () {
     this.items = {}
+    this.emptyKeys = []
   }
 
   addItem (key, item) {
@@ -12,27 +13,39 @@ class Queue {
       this.items[key] = []
     }
     this.items[key].push(item)
-  }
-
-  removeItem (key, i) {
-    if (!(key in this.items) || !this.items[key].length) {
-      return
+    const i = this.emptyKeys.indexOf(key)
+    if (i !== -1) {
+      this.emptyKeys.splice(i, 1)
     }
-    return this.items[key].splice(i, 1)
   }
 
   getItem (key) {
-    if (!(key in this.items) || !this.items[key].length) {
+    if (!this.getItemsCount(key)) {
       return
     }
     return this.items[key].shift()
   }
 
   getItemsCount (key) {
+    if (!(key in this.items)) {
+      return 0
+    }
     return this.items[key].length
   }
 
+  flushEmptyKeys () {
+    const keys = Object.keys(this.items)
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i]
+      if (this.getItemsCount(key) < 1) {
+        this.emptyKeys.push(key)
+        delete this.items[key]
+      }
+    }
+  }
+
   getKeys () {
+    this.flushEmptyKeys()
     return Object.keys(this.items)
   }
 

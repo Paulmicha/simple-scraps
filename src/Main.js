@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer')
 const urlParse = require('url-parse')
-const Queue = require('./queue')
+const Queue = require('./Queue')
 const cashPath = require.resolve('cash-dom')
 const debug = require('debug')
 const debugConsole = debug('simple-scraps:console')
