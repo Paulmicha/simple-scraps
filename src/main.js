@@ -94,10 +94,9 @@ class Main {
   async process (url) {
     // const page = await this.open(url)
     // await this.execOps(url, page)
+    // await page.close()
     await this.open(url)
     await this.execOps(url)
-    // TODO [wip] why does this get it closed too soon ?
-    // page.close()
   }
 
   /**
@@ -148,8 +147,8 @@ class Main {
       }
 
       // Debug
-      // console.log('Executing ' + url + " 'op' :")
-      // console.log(op)
+      console.log('Executing ' + url + " 'op' :")
+      console.log(op)
 
       // Merge context data with operation object representation for convenience.
       // op.url = url
@@ -179,18 +178,7 @@ class Main {
       op.selector = 'a[href]'
     }
 
-    // Failed debug (can't pass page as argument, had to use this.page)
-    // await op.page.evaluate(() => console.log('test'))
-
-    // Debug ok :
-    await this.page.evaluate(() => console.log('test'))
-
-    console.log(op)
-    await this.page.evaluate((selector) => console.log('test selector passed = ' + selector), op.selector)
-
-    // Fails :
-    // await this.page.waitForSelector(op.selector)
-
+    await this.page.waitForSelector(op.selector)
     const urlsFound = await this.page.evaluate((selector) => {
       // This function is running inside headless Chrome.
       const urlsFound = []
@@ -202,24 +190,20 @@ class Main {
     for (let i = 0; i < urlsFound.length; i++) {
       let urlFound = urlsFound[i]
 
-      console.log('urlFound = ' + urlFound)
-
       // Transforms non-absolute URLs into absolute URLS.
       if (urlFound.substring(0, 4) !== 'http') {
         const parsedOpUrl = urlParse(op.url)
         urlFound = parsedOpUrl.host + urlFound
       }
 
-      console.log('urlFound = ' + urlFound + ' (after)')
-
       // Recursion (e.g. page links)
-      // if (op.to === 'start') {
-      //   op.conf.url = urlFound
-      //   this.createInitialOps(op.conf)
-      // } else {
-      //   op.type = 'extract'
-      //   this.queue.addItem(urlFound, op)
-      // }
+      if (op.to === 'start') {
+        op.conf.url = urlFound
+        this.createInitialOps(op.conf)
+      } else {
+        op.type = 'extract'
+        this.queue.addItem(urlFound, op)
+      }
     }
   }
 
