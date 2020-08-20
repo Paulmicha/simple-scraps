@@ -1,6 +1,6 @@
 
 /**
- * Defines a queue of operations keyed by url.
+ * Defines a queue of items (operations) keyed by string (url).
  */
 class Queue {
   constructor () {
@@ -12,9 +12,6 @@ class Queue {
       this.items[key] = []
     }
     this.items[key].push(item)
-
-    // Debug
-    console.log(key, item)
   }
 
   removeItem (key, i) {
@@ -31,12 +28,27 @@ class Queue {
     return this.items[key].shift()
   }
 
-  getCount (key) {
+  getItemsCount (key) {
     return this.items[key].length
   }
 
   getKeys () {
     return Object.keys(this.items)
+  }
+
+  getKeysCount () {
+    return this.getKeys().length
+  }
+
+  getNextKey () {
+    const keys = this.getKeys()
+    if (keys.length) {
+      for (let i = 0; i < keys.length; i++) {
+        if (this.getItemsCount(keys[i])) {
+          return keys[i]
+        }
+      }
+    }
   }
 }
 

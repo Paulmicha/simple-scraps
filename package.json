@@ -6,6 +6,7 @@
   "dependencies": {
     "@sindresorhus/slugify": "^1.1.0",
     "cash-dom": "^8.0.0",
+    "debug": "^4.1.1",
     "mkdirp": "^1.0.4",
     "puppeteer": "^5.2.1",
     "url-parse": "^1.4.7"

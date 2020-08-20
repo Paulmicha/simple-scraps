@@ -27,10 +27,7 @@ Building blocks to "roll your own" :
 
 ## Current plan
 
-Borrows the concept of Drupal entities, roughly : a data model that can have 2 "levels" when appropriate - i.e. **entity type** / **bundle** (~ *class* / *sub-class*), ex : `content` / `page`, `taxonomy_term` / `tag`, `user` / `content_editor`, etc.
-
-Entities may have URLs (i.e. pages, articles, users, or even taxonomy terms), or not (i.e. config, blocks, menus).
-Entity types or bundles share the same **fields**.
+Borrows the concept of Drupal *entities*, which is essentially a data model that can have 2 "levels" when appropriate - i.e. **entity type** / **bundle** (~ *class* / *sub-class*), ex : `content` / `page`, `taxonomy_term` / `tag`, etc. Entity types or bundles share the same **fields**.
 
 Example content entities object structure (JSON output, see section *Content model and Structured Data Mapping* below) :
 
@@ -44,7 +41,7 @@ Example content entities object structure (JSON output, see section *Content mod
   "tags": [],                               ← [optional] Taxonomy terms entity references
   "published": "2020-08-25T15:12:36.594Z",  ← [optional] ISO 8601 publication date
   "uuid": "dd2aaa05-7d00-493c-9373-a0f695862850", ← [optional] For easier entity refs
-  "content": []                             ← [optional] Main page contents (see Rich content editing)
+  "content": []                             ← [optional] Main "body" contents
 }
 ```
 
@@ -53,9 +50,9 @@ TODO [wip] config object format and resulting process is currently being sketche
 ```txt
 path/to/project/docroot/
   ├── data/                           ← [git-ignored] Structured data
-  │   ├─ cache/                       ← [git-ignored] Crawl sessions backups
+  │   ├── cache/
   │   │   └── www.chouette.net.br/
-  │   │       └── ...                 ← Maps the URL structure of the site (HTML markup + screenshots / pdfs ?)
+  │   │       └── ...                 ← Scraped pages backups (markup, screenshots, pdfs)
   │   ├── output/
   │   │   └── www.chouette.net.br/
   │   │       ├── blog/
@@ -65,6 +62,7 @@ path/to/project/docroot/
   │   │           ├── dc49234b-53a7-452a-a2be-23e7121d3be1.json
   │   │           └── ...
   │   ├── sessions/
+  │   │   └── ...                     ← Crawling config (JSON files)
   │   └── ...
   ├── src/
   └── ...
@@ -72,9 +70,11 @@ path/to/project/docroot/
 
 ## Crawling process
 
+(cf. API ref from the [puppeteer repo](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md))
+
 The configuration object contains "entry points", or "destinations". Its root keys are values that may be used in `to` keys (except when they contain wildcards).
 
-The `start` key defines the initial URLs where links to individual content pages or pager links will be collected. These will then be followed and associated with an entry point. The `"to": "start"` defines a recursion to start over the same process on selected link.
+The `start` key defines the initial URLs where links to individual content pages or pager links will be collected. These will then be followed and associated with an entry point. The `"to": "start"` defines a recursion to start over the same process from followed link.
 
 ## Content model and Structured Data Mapping
 
@@ -130,24 +130,35 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
       "selector": "article.node .field-name-field-tags > a",
       "extract": "text",
       "as": "taxonomy/tag",
-      "postprocess": "tag_link_text"
+      "postprocess": "mapTaxonomyTagTitle"
     }
   ],
   "components": [
     {
       "selector": ".content > .p-percent-h > .c-text-block.u-fs-m",
       "extract": "text",
-      "to": "component/Lede",
-      "as": "prop.text"
+      "as": "component/Lede:text"
     },
     {
       "selector": ".c-pimg",
       "extract": [
         {
-          // TODO [wip] inner selectors to map to component props.
+          "selector": ".c-pimg__img",
+          "extract": "element",
+          "postprocess": "mapMediaGridItemImage"
+        },
+        {
+          "selector": ".c-pimg__text > h2",
+          "extract": "text",
+          "as": "component/MediaGrid:item[].title"
+        },
+        {
+          "selector": ".c-pimg__text > .s-rich-text",
+          "extract": "markup",
+          "as": "component/MediaGrid:item[].text"
         }
       ],
-      "to": "component/MediaGrid"
+      "as": "component/MediaGrid"
     }
   ]
 }
