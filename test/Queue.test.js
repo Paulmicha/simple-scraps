@@ -58,21 +58,27 @@ test('4. Items enqueued or dequeued in a loop must correctly impact its lifetime
 })
 
 test('5. A loop on the keys must correctly end when all items from all keys are pulled', t => {
-  let cycleCount = 0
   const queue = new Queue()
+  const keys = [key, additionalKeys[0], additionalKeys[1]]
+
   for (let i = 1; i <= 10; i++) {
-    queue.addItem(key, { hello: 'world' + i })
-    additionalKeys.forEach(k => {
+    keys.forEach(k => {
       queue.addItem(k, { hello: 'world' + i })
     })
   }
-  const keys = [key, additionalKeys[0], additionalKeys[1]]
+
+  let cycleCount = 0
   while (queue.getKeysCount()) {
-    let innerCycleCount = 0
     // console.log('getKeysCount = ' + queue.getKeysCount())
     if (keys[cycleCount]) {
       // console.log('emptying key : ' + keys[cycleCount])
       // console.log('getItemsCount before = ' + queue.getItemsCount(keys[cycleCount]))
+
+      // Before emptying the items from current key, getNextKey() must still
+      // return the current key.
+      t.is(keys[cycleCount], queue.getNextKey())
+
+      let innerCycleCount = 0
       while (queue.getItemsCount(keys[cycleCount])) {
         innerCycleCount++
         queue.getItem(keys[cycleCount])
@@ -82,6 +88,9 @@ test('5. A loop on the keys must correctly end when all items from all keys are 
         }
       }
       // console.log('getItemsCount after = ' + queue.getItemsCount(keys[cycleCount]))
+
+      // Immediately after emptying the items from current key, getNextKey()
+      // now must return the next key.
       if (keys[cycleCount + 1]) {
         t.is(keys[cycleCount + 1], queue.getNextKey())
       }

@@ -28,6 +28,8 @@ class Main {
     this.queue = new Queue()
     this.browser = await puppeteer.launch()
     this.page = await this.browser.newPage()
+    this.crawledUrls = []
+    this.crawlLimits = {}
   }
 
   /**
@@ -74,6 +76,7 @@ class Main {
         type: 'follow',
         selector: op.selector,
         to: op.to,
+        maxTotalCrawl: ('maxTotalCrawl' in op) ? op.maxTotalCrawl : 0,
         conf: start
       })
 
@@ -92,9 +95,6 @@ class Main {
    * the same Puppeteer page for all operations to be carried out by URL.
    */
   async process (url) {
-    // const page = await this.open(url)
-    // await this.execOps(url, page)
-    // await page.close()
     await this.open(url)
     await this.execOps(url)
   }
@@ -103,15 +103,12 @@ class Main {
    * Opens a new Puppeteer page and loads given URL.
    */
   async open (url) {
-    // const page = await this.browser.newPage()
     await this.page.setViewport({ width: 1280, height: 800 })
 
     this.page.on('pageerror', text => debugConsole(text))
-    this.page.on('console', msg => console.log(`${msg.type()} ${msg.text()} at ${url}`))
+    // this.page.on('console', msg => console.log(`${msg.type()} ${msg.text()} at ${url}`))
     this.page.on('dialog', dialog => this.handleDialog(dialog, url))
-
-    // Debug.
-    this.page.on('close', () => console.log('page is closed'))
+    this.page.on('close', () => console.log('The browser page was closed.'))
 
     await this.page.goto(url)
 
@@ -131,14 +128,11 @@ class Main {
     if (!jQueryExists) {
       await this.page.addScriptTag({ path: cashPath })
     }
-
-    // return page
   }
 
   /**
    * Executes all operations queued for given URL.
    */
-  // async execOps (url, page) {
   async execOps (url) {
     while (this.queue.getItemsCount(url)) {
       const op = this.queue.getItem(url)
@@ -147,16 +141,11 @@ class Main {
       }
 
       // Debug
-      console.log('Executing ' + url + " 'op' :")
-      console.log(op)
-
-      // Merge context data with operation object representation for convenience.
-      // op.url = url
-      // op.page = page
+      // console.log('Executing ' + url + " 'op' :")
+      // console.log(op)
 
       switch (op.type) {
         case 'follow':
-          // await this.findLinks(url, page, op)
           await this.findLinks(url, op)
           break
       }
@@ -171,7 +160,6 @@ class Main {
     return await this.page.content()
   }
 
-  // async findLinks (url, page, op) {
   async findLinks (url, op) {
     // Defaults to look for all <a href="..."> in the page.
     if (!op.selector) {
@@ -196,11 +184,37 @@ class Main {
         urlFound = parsedOpUrl.host + urlFound
       }
 
-      // Recursion (e.g. page links)
+      // Prevent re-crawling the same URLs.
+      if (this.crawledUrls.indexOf(urlFound) !== -1) {
+        // Debug ok.
+        // console.log("We've already crawled " + urlFound + ' -> skipping')
+        continue
+      }
+      this.crawledUrls.push(urlFound)
+
+      // Handle crawling limits.
+      const limitID = op.to + '::' + op.selector
+      if (!(limitID in this.crawlLimits)) {
+        this.crawlLimits[limitID] = 0
+      }
+      this.crawlLimits[limitID]++
+
+      if (this.crawlLimits[limitID] > op.maxTotalCrawl) {
+        // Debug ok.
+        // console.log("We've reached the crawling limit for " + limitID + ' : ' + this.crawlLimits[limitID])
+        continue
+      }
+
+      // Debug.
+      console.log(this.crawlLimits[limitID] + ' : ' + urlFound + '  :  ' + limitID)
+
+      // Execution depends on the "type" of link.
       if (op.to === 'start') {
+        // Recursion (e.g. page links).
         op.conf.url = urlFound
         this.createInitialOps(op.conf)
       } else {
+        // Normal extraction.
         op.type = 'extract'
         this.queue.addItem(urlFound, op)
       }
