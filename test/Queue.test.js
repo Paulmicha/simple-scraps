@@ -82,6 +82,9 @@ test('5. A loop on the keys must correctly end when all items from all keys are 
         }
       }
       // console.log('getItemsCount after = ' + queue.getItemsCount(keys[cycleCount]))
+      if (keys[cycleCount + 1]) {
+        t.is(keys[cycleCount + 1], queue.getNextKey())
+      }
     }
     cycleCount++
     // Safety circuit breaker.
