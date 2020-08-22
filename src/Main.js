@@ -17,6 +17,7 @@ class Main {
   constructor (config) {
     this.config = config
     this.pages = []
+    this.openPages = {}
     this.pagesAllocationCursor = 0
     this.operations = new Queue()
     this.crawledUrls = []
@@ -131,10 +132,7 @@ class Main {
    * the same Puppeteer page for all operations to be carried out by URL.
    */
   async process (url) {
-    const pageWorker = this.pages[this.pagesAllocationCursor]
-
-    // Debug.
-    console.log(`Process ${url} using slot ${this.pagesAllocationCursor} / ${this.getSetting('maxParallelPages')}`)
+    const pageWorker = this.allocate(url)
 
     // Delay.
     const delayBounds = this.getSetting('crawlDelay')
@@ -166,12 +164,30 @@ class Main {
           break
       }
     }
+  }
+
+  /**
+   * Distributes operations among open pages by URL.
+   */
+  allocate (url) {
+    // If an URL was already opened by a page, reuse the same.
+    let pageAllocationCursor = this.pagesAllocationCursor
+    if (url in this.openPages) {
+      pageAllocationCursor = this.openPages[url]
+    } else {
+      this.openPages[url] = pageAllocationCursor
+    }
 
     // Rotate the distribution among opened pages.
     this.pagesAllocationCursor++
-    if (this.pagesAllocationCursor > this.getSetting('maxParallelPages')) {
+    if (this.pagesAllocationCursor >= this.getSetting('maxParallelPages')) {
       this.pagesAllocationCursor = 0
     }
+
+    // Debug.
+    console.log(`\nProcess ${url} using slot ${pageAllocationCursor + 1} / ${this.getSetting('maxParallelPages')}`)
+
+    return this.pages[pageAllocationCursor]
   }
 
   /**
