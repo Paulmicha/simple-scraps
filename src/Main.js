@@ -1,10 +1,7 @@
 const puppeteer = require('puppeteer')
 const urlParse = require('url-parse')
+const Page = require('./Page')
 const Queue = require('./Queue')
-const cashPath = require.resolve('cash-dom')
-const debug = require('debug')
-const debugConsole = debug('simple-scraps:console')
-// const debugDialog = debug('simple-scraps:dialog')
 
 /**
  * Main "simple scraps" class.
@@ -19,6 +16,28 @@ const debugConsole = debug('simple-scraps:console')
 class Main {
   constructor (config) {
     this.config = config
+    this.crawledUrls = []
+    this.crawlLimits = {}
+  }
+
+  /**
+   * General config getter.
+   *
+   * Also provides default settings.
+   */
+  getSetting (setting) {
+    if (!('settings' in this.config)) {
+      this.config.settings = {}
+    }
+    if (!(setting in this.config.settings)) {
+      switch (setting) {
+        case 'addDomQueryHelper':
+          return true
+        case 'maxParallelPages':
+          return 4
+      }
+    }
+    return this.config.settings[setting]
   }
 
   /**
@@ -27,9 +46,10 @@ class Main {
   async init () {
     this.queue = new Queue()
     this.browser = await puppeteer.launch()
-    this.page = await this.browser.newPage()
-    this.crawledUrls = []
-    this.crawlLimits = {}
+
+    this.pageWorker = new Page(this)
+    await this.pageWorker.init(this.browser)
+    this.page = this.pageWorker.page
   }
 
   /**
@@ -76,7 +96,7 @@ class Main {
         type: 'follow',
         selector: op.selector,
         to: op.to,
-        maxTotalCrawl: ('maxTotalCrawl' in op) ? op.maxTotalCrawl : 0,
+        maxPagesToCrawl: ('maxPagesToCrawl' in op) ? op.maxPagesToCrawl : 0,
         conf: start
       })
 
@@ -95,39 +115,8 @@ class Main {
    * the same Puppeteer page for all operations to be carried out by URL.
    */
   async process (url) {
-    await this.open(url)
+    await this.pageWorker.open(url)
     await this.execOps(url)
-  }
-
-  /**
-   * Opens a new Puppeteer page and loads given URL.
-   */
-  async open (url) {
-    await this.page.setViewport({ width: 1280, height: 800 })
-
-    this.page.on('pageerror', text => debugConsole(text))
-    // this.page.on('console', msg => console.log(`${msg.type()} ${msg.text()} at ${url}`))
-    this.page.on('dialog', dialog => this.handleDialog(dialog, url))
-    this.page.on('close', () => console.log('The browser page was closed.'))
-
-    await this.page.goto(url)
-
-    // Utility helper to help DOM querying / manipulation.
-    // If jQuery is already loaded, make sure it's available in global scope as
-    // the $() function. Otherwise, include the 'cash-dom' lib.
-    const jQueryExists = await this.page.evaluate(() => {
-      // This function is running inside headless Chrome.
-      if (typeof jQuery === 'function') {
-        if (!window.$ || typeof window.$ !== 'function') {
-          window.$ = jQuery
-        }
-        return true
-      }
-      return false
-    })
-    if (!jQueryExists) {
-      await this.page.addScriptTag({ path: cashPath })
-    }
   }
 
   /**
@@ -154,10 +143,6 @@ class Main {
 
   async stop () {
     await this.browser.close()
-  }
-
-  async getContent () {
-    return await this.page.content()
   }
 
   async findLinks (url, op) {
@@ -199,7 +184,7 @@ class Main {
       }
       this.crawlLimits[limitID]++
 
-      if (this.crawlLimits[limitID] > op.maxTotalCrawl) {
+      if (this.crawlLimits[limitID] > op.maxPagesToCrawl) {
         // Debug ok.
         // console.log("We've reached the crawling limit for " + limitID + ' : ' + this.crawlLimits[limitID])
         continue

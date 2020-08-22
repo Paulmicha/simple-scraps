@@ -47,7 +47,7 @@ Example script `./scrap.js` contents :
 
 ```js
 const SimpleScraps = require('./src/Main')
-const config = require('./data/sessions/localhost.json')
+const config = require('./data/sessions/www.chouette.net.br.blog.json')
 
 const scraps = new SimpleScraps(config)
 
@@ -60,7 +60,7 @@ const launch = async () => {
 launch()
 ```
 
-For the config file contents (`./data/sessions/localhost.json`), see below :
+For the config file contents (`./data/sessions/www.chouette.net.br.blog.json`), see below :
 
 ## Configuration (individual crawling sessions setup)
 
@@ -77,12 +77,13 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
         {
           "selector": ".view-chouette-articles article h2 > a",
           "to": "content/blog",
-          "cache": true
+          "cache": true,
+          "maxPagesToCrawl": 3
         },
         {
           "selector": ".view-chouette-articles .c-pagination a",
           "to": "start",
-          "maxTotalCrawl": 5
+          "maxPagesToCrawl": 2
         }
       ]
     }
