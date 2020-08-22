@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer')
-const urlParse = require('url-parse')
 const Page = require('./Page')
 const Queue = require('./Queue')
+const extract = require('./extract')
 
 /**
  * Main "simple scraps" class.
@@ -135,7 +135,7 @@ class Main {
 
       switch (op.type) {
         case 'follow':
-          await this.findLinks(url, op)
+          await extract.linksUrl(this, this.page, url, op)
           break
       }
     }
@@ -143,79 +143,6 @@ class Main {
 
   async stop () {
     await this.browser.close()
-  }
-
-  async findLinks (url, op) {
-    // Defaults to look for all <a href="..."> in the page.
-    if (!op.selector) {
-      op.selector = 'a[href]'
-    }
-
-    await this.page.waitForSelector(op.selector)
-    const urlsFound = await this.page.evaluate((selector) => {
-      // This function is running inside headless Chrome.
-      const urlsFound = []
-      const anchors = Array.from(document.querySelectorAll(selector))
-      anchors.map((anchor) => urlsFound.push(anchor.href))
-      return urlsFound
-    }, op.selector)
-
-    for (let i = 0; i < urlsFound.length; i++) {
-      let urlFound = urlsFound[i]
-
-      // Transforms non-absolute URLs into absolute URLS.
-      if (urlFound.substring(0, 4) !== 'http') {
-        const parsedOpUrl = urlParse(op.url)
-        urlFound = parsedOpUrl.host + urlFound
-      }
-
-      // Prevent re-crawling the same URLs.
-      if (this.crawledUrls.indexOf(urlFound) !== -1) {
-        // Debug ok.
-        // console.log("We've already crawled " + urlFound + ' -> skipping')
-        continue
-      }
-      this.crawledUrls.push(urlFound)
-
-      // Handle crawling limits.
-      const limitID = op.to + '::' + op.selector
-      if (!(limitID in this.crawlLimits)) {
-        this.crawlLimits[limitID] = 0
-      }
-      this.crawlLimits[limitID]++
-
-      if (this.crawlLimits[limitID] > op.maxPagesToCrawl) {
-        // Debug ok.
-        // console.log("We've reached the crawling limit for " + limitID + ' : ' + this.crawlLimits[limitID])
-        continue
-      }
-
-      // Debug.
-      console.log(this.crawlLimits[limitID] + ' : ' + urlFound + '  :  ' + limitID)
-
-      // Execution depends on the "type" of link.
-      if (op.to === 'start') {
-        // Recursion (e.g. page links).
-        op.conf.url = urlFound
-        this.createInitialOps(op.conf)
-      } else {
-        // Normal extraction.
-        op.type = 'extract'
-        this.queue.addItem(urlFound, op)
-      }
-    }
-  }
-
-  /**
-   * Deals with alerts.
-   *
-   * Taken from yujiosaka/headless-chrome-crawler.
-   * See https://github.com/yujiosaka/headless-chrome-crawler/blob/master/lib/crawler.js
-   */
-  async handleDialog (dialog, url) {
-    // debugDialog(`${dialog.type()} ${dialog.message()} at ${url}`)
-    console.log(`${dialog.type()} ${dialog.message()} at ${url}`)
-    await dialog.dismiss()
   }
 }
 
