@@ -30,6 +30,8 @@ test('3. Keys must be unique and iterable via getNextKey()', t => {
   })
   t.is(3, queue.getKeysCount())
   t.is(key, queue.getNextKey())
+  t.is(additionalKeys[0], queue.getNextKey(1))
+  t.is(additionalKeys[1], queue.getNextKey(2))
   const [val1, val2, val3] = queue.getKeys()
   t.is(key, val1)
   t.is(additionalKeys[0], val2)

@@ -16,6 +16,9 @@ const extract = require('./extract')
 class Main {
   constructor (config) {
     this.config = config
+    this.pages = []
+    this.pagesAllocationCursor = 0
+    this.operations = new Queue()
     this.crawledUrls = []
     this.crawlLimits = {}
   }
@@ -35,73 +38,86 @@ class Main {
           return true
         case 'maxParallelPages':
           return 4
+        case 'crawlDelay':
+          return [500, 2500]
       }
     }
     return this.config.settings[setting]
   }
 
   /**
-   * Instanciates Puppeteer and the operation queue.
+   * Instanciates the headless browser with 1 page per maxParallelPages setting.
    */
   async init () {
-    this.queue = new Queue()
     this.browser = await puppeteer.launch()
-
-    this.pageWorker = new Page(this)
-    await this.pageWorker.init(this.browser)
-    this.page = this.pageWorker.page
+    const promises = []
+    for (let i = 0; i < this.getSetting('maxParallelPages'); i++) {
+      const page = new Page(this)
+      this.pages.push(page)
+      promises.push(page.init(this.browser))
+    }
+    await Promise.all(promises)
   }
 
   /**
-   * Populates the queue with initial operations.
+   * Populates the queue with initial operations and starts the main loop.
    *
-   * Each start item defines an URL from which some links may be followed.
+   * Each entry point defines an URL from which some links may be followed.
+   * Operations are processed in batch of up to 'maxParallelPages' pages (1 page
+   * per URL).
    */
   async start (configOverride) {
-    const config = configOverride || this.config.start
-    if (!config) {
+    const entryPoints = configOverride || this.config.start
+    if (!entryPoints) {
       throw Error('Error : missing start config')
     }
 
     // Begins with populating the initial URL(s) operation(s).
-    for (let i = 0; i < config.length; i++) {
-      const start = config[i]
-      if (!start.url) {
+    for (let i = 0; i < entryPoints.length; i++) {
+      const entryPoint = entryPoints[i]
+      if (!entryPoint.url) {
         throw Error('Error : missing start url')
       }
-      if (!start.follow) {
+      if (!entryPoint.follow) {
         throw Error('Error : missing start links to follow')
       }
-      this.createInitialOps(start)
+      this.createInitialOps(entryPoint)
     }
 
     // Starts the process.
-    while (this.queue.getKeysCount()) {
-      const url = this.queue.getNextKey()
-      if (!url) {
-        break
+    while (this.operations.getKeysCount()) {
+      const promises = []
+      for (let j = 0; j < this.getSetting('maxParallelPages'); j++) {
+        const url = this.operations.getNextKey(j)
+        if (url) {
+          promises.push(this.process(url))
+        }
       }
-      await this.process(url)
+      await Promise.all(promises)
     }
+  }
+
+  async stop () {
+    await this.browser.close()
   }
 
   /**
    * Creates initial operations.
    */
-  async createInitialOps (start) {
-    for (let j = 0; j < start.follow.length; j++) {
-      const op = start.follow[j]
+  async createInitialOps (entryPoint) {
+    for (let j = 0; j < entryPoint.follow.length; j++) {
+      const op = entryPoint.follow[j]
 
-      this.queue.addItem(start.url, {
+      this.operations.addItem(entryPoint.url, {
         type: 'follow',
         selector: op.selector,
         to: op.to,
         maxPagesToCrawl: ('maxPagesToCrawl' in op) ? op.maxPagesToCrawl : 0,
-        conf: start
+        conf: entryPoint
       })
 
       if (op.cache) {
-        this.queue.addItem(start.url, {
+        this.operations.addItem(entryPoint.url, {
           type: 'cache'
         })
       }
@@ -115,34 +131,107 @@ class Main {
    * the same Puppeteer page for all operations to be carried out by URL.
    */
   async process (url) {
-    await this.pageWorker.open(url)
-    await this.execOps(url)
-  }
+    const pageWorker = this.pages[this.pagesAllocationCursor]
 
-  /**
-   * Executes all operations queued for given URL.
-   */
-  async execOps (url) {
-    while (this.queue.getItemsCount(url)) {
-      const op = this.queue.getItem(url)
+    // Debug.
+    console.log(`Process ${url} using slot ${this.pagesAllocationCursor} / ${this.getSetting('maxParallelPages')}`)
+
+    // Delay.
+    const delayBounds = this.getSetting('crawlDelay')
+    if (delayBounds && delayBounds.length) {
+      const delayAmount = delayBounds[0] + (Math.random() * (delayBounds[1] - delayBounds[0]))
+      await new Promise((resolve, reject) => setTimeout(resolve, delayAmount))
+    }
+
+    // Navigate to the URL
+    await pageWorker.open(url)
+
+    // Executes all operations queued for given URL.
+    while (this.operations.getItemsCount(url)) {
+      const op = this.operations.getItem(url)
       if (!op) {
         return
       }
 
       // Debug
-      // console.log('Executing ' + url + " 'op' :")
+      console.log('Executing ' + url + " 'op' :" + op.type)
       // console.log(op)
 
       switch (op.type) {
         case 'follow':
-          await extract.linksUrl(this, this.page, url, op)
+          await this.crawl(pageWorker.page, op)
           break
+        case 'extract':
+          await this.extract(pageWorker.page, op)
+          break
+      }
+    }
+
+    // Rotate the distribution among opened pages.
+    this.pagesAllocationCursor++
+    if (this.pagesAllocationCursor > this.getSetting('maxParallelPages')) {
+      this.pagesAllocationCursor = 0
+    }
+  }
+
+  /**
+   * Finds links to follow and creates operations (which will then get reaped in
+   * the main loop).
+   *
+   * Applies limits if set.
+   */
+  async crawl (page, op) {
+    const urlsFound = await extract.linksUrl(page, op.selector)
+    if (!urlsFound || !urlsFound.length) {
+      return
+    }
+
+    for (let i = 0; i < urlsFound.length; i++) {
+      const urlFound = urlsFound[i]
+
+      // Prevent re-crawling the same URLs.
+      if (this.crawledUrls.indexOf(urlFound) !== -1) {
+        // Debug ok.
+        console.log("We've already crawled " + urlFound + ' -> skipping')
+        continue
+      }
+      this.crawledUrls.push(urlFound)
+
+      // Handle crawling limits.
+      const limitID = op.to + '::' + op.selector
+      if (!(limitID in this.crawlLimits)) {
+        this.crawlLimits[limitID] = 0
+      }
+      this.crawlLimits[limitID]++
+
+      if (this.crawlLimits[limitID] > op.maxPagesToCrawl) {
+        // Debug ok.
+        console.log("We've reached the crawling limit for " + limitID + ' : ' + this.crawlLimits[limitID])
+        continue
+      }
+
+      // Debug.
+      console.log(this.crawlLimits[limitID] + ' : ' + urlFound + '  :  ' + limitID)
+
+      // Execution depends on the "type" of link.
+      if (op.to === 'start') {
+        // Recursion (e.g. page links).
+        op.conf.url = urlFound
+        this.createInitialOps(op.conf)
+      } else {
+        // Normal extraction.
+        op.type = 'extract'
+        this.operations.addItem(urlFound, op)
       }
     }
   }
 
-  async stop () {
-    await this.browser.close()
+  /**
+   * TODO [wip] extraction process starting point.
+   */
+  async extract (page, op) {
+    console.log('extraction TODO for url = ' + page.url())
+    console.log(op)
   }
 }
 

@@ -1,6 +1,8 @@
 
 /**
- * Defines a queue of items (operations) keyed by string (url).
+ * Defines a queue of items keyed by string.
+ *
+ * Used to handle simultaneously opened pages and operations by URL.
  */
 class Queue {
   constructor () {
@@ -53,10 +55,13 @@ class Queue {
     return this.getKeys().length
   }
 
-  getNextKey () {
+  getNextKey (offset) {
     const keys = this.getKeys()
     if (keys.length) {
       for (let i = 0; i < keys.length; i++) {
+        if (offset && i < offset) {
+          continue
+        }
         if (this.getItemsCount(keys[i])) {
           return keys[i]
         }
