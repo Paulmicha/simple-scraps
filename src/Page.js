@@ -16,10 +16,12 @@ class Page {
   /**
    * Instanciates the new page.
    */
-  async init (browser) {
-    this.browser = browser
-    this.page = await this.browser.newPage()
-    await this.page.setViewport({ width: 1280, height: 800 })
+  async init () {
+    this.page = await this.main.browser.newPage()
+    await this.page.setViewport({
+      width: this.main.getSetting('pageW'),
+      height: this.main.getSetting('pageH')
+    })
   }
 
   /**

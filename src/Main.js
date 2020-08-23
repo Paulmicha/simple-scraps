@@ -3,6 +3,7 @@ const Page = require('./Page')
 const Queue = require('./Queue')
 const extract = require('./extract')
 const cache = require('./cache')
+const fs = require('fs')
 
 /**
  * Main "simple scraps" class.
@@ -36,12 +37,20 @@ class Main {
     }
     if (!(setting in this.config.settings)) {
       switch (setting) {
+        case 'pageW':
+          return 1280
+        case 'pageH':
+          return 800
         case 'addDomQueryHelper':
           return true
         case 'maxParallelPages':
           return 4
         case 'crawlDelay':
           return [500, 2500]
+        case 'cacheWithScreenshot':
+          return true
+        case 'cacheSkipExisiting':
+          return true
       }
     }
     return this.config.settings[setting]
@@ -56,7 +65,7 @@ class Main {
     for (let i = 0; i < this.getSetting('maxParallelPages'); i++) {
       const page = new Page(this)
       this.pages.push(page)
-      promises.push(page.init(this.browser))
+      promises.push(page.init())
     }
     await Promise.all(promises)
   }
@@ -68,8 +77,8 @@ class Main {
    * Operations are processed in batch of up to 'maxParallelPages' pages (1 page
    * per URL).
    */
-  async start (configOverride) {
-    const entryPoints = configOverride || this.config.start
+  async start () {
+    const entryPoints = this.config.start
     if (!entryPoints) {
       throw Error('Error : missing start config')
     }
@@ -104,7 +113,7 @@ class Main {
   }
 
   /**
-   * Creates initial operations.
+   * Creates initial operations (adds new pages to crawl).
    */
   async createInitialOps (entryPoint) {
     for (let j = 0; j < entryPoint.follow.length; j++) {
@@ -137,7 +146,7 @@ class Main {
       await new Promise((resolve, reject) => setTimeout(resolve, delayAmount))
     }
 
-    // Navigate to the URL
+    // Navigate to the URL.
     await pageWorker.open(url)
 
     // Executes all operations queued for given URL.
@@ -170,11 +179,11 @@ class Main {
    */
   allocate (url) {
     // If an URL was already opened by a page, reuse the same.
-    let pageAllocationCursor = this.pagesAllocationCursor
+    let cursor = this.pagesAllocationCursor
     if (url in this.openPages) {
-      pageAllocationCursor = this.openPages[url]
+      cursor = this.openPages[url]
     } else {
-      this.openPages[url] = pageAllocationCursor
+      this.openPages[url] = cursor
     }
 
     // Rotate the distribution among opened pages.
@@ -184,9 +193,9 @@ class Main {
     }
 
     // Debug.
-    // console.log(`\nProcess ${url} using slot ${pageAllocationCursor + 1} / ${this.getSetting('maxParallelPages')}`)
+    // console.log(`\nProcess ${url} using slot ${cursor + 1} / ${this.getSetting('maxParallelPages')}`)
 
-    return this.pages[pageAllocationCursor]
+    return this.pages[cursor]
   }
 
   /**
@@ -259,11 +268,29 @@ class Main {
    * Caching process starting point.
    */
   async cache (pageWorker, op) {
-    // Debug.
-    console.log('Caching page ' + pageWorker.page.url())
+    const url = pageWorker.page.url()
 
+    // Debug.
+    // console.log('Caching page ' + url)
+
+    // Save page markup.
     const pageContent = await pageWorker.getContent()
-    cache.writePageMarkup(pageWorker.page.url(), pageContent)
+    cache.writePageMarkup(url, pageContent, this.getSetting('cacheSkipExisiting'))
+
+    // Save a screenshot.
+    if (this.getSetting('cacheWithScreenshot')) {
+      let suffix = '.screenshot-'
+      suffix += this.getSetting('pageW') + 'x' + this.getSetting('pageH')
+      suffix += '.png'
+      const filePath = cache.getFilePath(url, suffix)
+      if (this.getSetting('cacheSkipExisiting') && fs.existsSync(filePath)) {
+        return
+      }
+      await pageWorker.page.screenshot({
+        path: filePath,
+        fullPage: true
+      })
+    }
   }
 }
 

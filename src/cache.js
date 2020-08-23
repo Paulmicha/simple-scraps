@@ -6,12 +6,16 @@
 const fs = require('fs')
 const urlParse = require('url-parse')
 const slugify = require('@sindresorhus/slugify')
+const beautifyHtml = require('js-beautify').html
 const { writeFile } = require('./utils/fs')
 
 /**
  * Converts an URL to a cache file path.
  */
-const getFilePath = (url) => {
+const getFilePath = (url, suffix) => {
+  if (!suffix) {
+    suffix = '.html'
+  }
   const parsedUrl = urlParse(url)
   if (parsedUrl.pathname.length === 0 || parsedUrl.pathname === '/') {
     parsedUrl.pathname = '/index'
@@ -30,7 +34,7 @@ const getFilePath = (url) => {
   }
 
   const fileName = parsedUrl.hostname + filePath + extras
-  return `data/cache/${fileName}.html`
+  return `data/cache/${fileName}${suffix}`
 }
 
 /**
@@ -41,9 +45,13 @@ const writePageMarkup = (url, content, skipExisting) => {
   if (skipExisting && fs.existsSync(filePath)) {
     return
   }
-  writeFile(filePath, content)
+  writeFile(filePath, beautifyHtml(content, {
+    indent_size: 2,
+    max_preserve_newlines: 1
+  }))
 }
 
 module.exports = {
+  getFilePath: getFilePath,
   writePageMarkup: writePageMarkup
 }
