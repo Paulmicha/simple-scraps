@@ -114,7 +114,7 @@ class Main {
         selector: op.selector,
         to: op.to,
         maxPagesToCrawl: ('maxPagesToCrawl' in op) ? op.maxPagesToCrawl : 0,
-        conf: entryPoint
+        conf: { ...entryPoint }
       })
 
       if (op.cache) {
@@ -152,7 +152,7 @@ class Main {
       }
 
       // Debug
-      console.log('Executing ' + url + " 'op' :" + op.type)
+      // console.log('Executing ' + url + " 'op' :" + op.type)
       // console.log(op)
 
       switch (op.type) {
@@ -160,6 +160,7 @@ class Main {
           await this.crawl(pageWorker.page, op)
           break
         case 'extract':
+          console.log('process.extract : ' + url + ' / op.conf.url = ' + op.conf.url)
           await this.extract(pageWorker.page, op)
           break
       }
@@ -185,7 +186,7 @@ class Main {
     }
 
     // Debug.
-    console.log(`\nProcess ${url} using slot ${pageAllocationCursor + 1} / ${this.getSetting('maxParallelPages')}`)
+    // console.log(`\nProcess ${url} using slot ${pageAllocationCursor + 1} / ${this.getSetting('maxParallelPages')}`)
 
     return this.pages[pageAllocationCursor]
   }
@@ -208,13 +209,17 @@ class Main {
       // Prevent re-crawling the same URLs.
       if (this.crawledUrls.indexOf(urlFound) !== -1) {
         // Debug ok.
-        console.log("We've already crawled " + urlFound + ' -> skipping')
+        // console.log("We've already crawled " + urlFound + ' -> skipping')
         continue
       }
       this.crawledUrls.push(urlFound)
 
       // Handle crawling limits.
-      const limitID = op.to + '::' + op.selector
+      // We need to uniquely identify each "follow" block from config in order
+      // to apply the limit. Given the way config is structured, for now, we
+      // differenciate those blocks by concatenating the "to" key with the
+      // selector.
+      const limitID = op.to + ' :: ' + op.selector
       if (!(limitID in this.crawlLimits)) {
         this.crawlLimits[limitID] = 0
       }
@@ -222,16 +227,16 @@ class Main {
 
       if (this.crawlLimits[limitID] > op.maxPagesToCrawl) {
         // Debug ok.
-        console.log("We've reached the crawling limit for " + limitID + ' : ' + this.crawlLimits[limitID])
+        // console.log("We've reached the crawling limit for " + limitID + ' : ' + this.crawlLimits[limitID])
         continue
       }
 
       // Debug.
-      console.log(this.crawlLimits[limitID] + ' : ' + urlFound + '  :  ' + limitID)
+      console.log(`${this.crawlLimits[limitID]} x ${limitID} for ${urlFound}`)
 
       // Execution depends on the "type" of link.
       if (op.to === 'start') {
-        // Recursion (e.g. page links).
+        // Recursion (e.g. pager links).
         op.conf.url = urlFound
         this.createInitialOps(op.conf)
       } else {
@@ -247,7 +252,8 @@ class Main {
    */
   async extract (page, op) {
     console.log('extraction TODO for url = ' + page.url())
-    console.log(op)
+    console.log('  (from ' + op.conf.url + ')')
+    // console.log(op)
   }
 }
 
