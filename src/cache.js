@@ -1,8 +1,9 @@
 /**
  * @file
- * Local file-based cache.
+ * Contains local file-based cache implementations.
  */
 
+const fs = require('fs')
 const urlParse = require('url-parse')
 const slugify = require('@sindresorhus/slugify')
 const { writeFile } = require('./utils/fs')
@@ -10,23 +11,39 @@ const { writeFile } = require('./utils/fs')
 /**
  * Converts an URL to a cache file path.
  */
-const cacheGetFilePath = (url) => {
+const getFilePath = (url) => {
   const parsedUrl = urlParse(url)
   if (parsedUrl.pathname.length === 0 || parsedUrl.pathname === '/') {
     parsedUrl.pathname = '/index'
   }
   const pathParts = parsedUrl.pathname.split('/')
   const filePath = pathParts.map(part => slugify(part)).join('/')
-  return `data/cache/${parsedUrl.hostname + filePath}.html`
+
+  // For query args and anchors, convert to a file name safe string.
+  let extras = ''
+  if (parsedUrl.query) {
+    // extras += parsedUrl.query.replace(/\?|=|&/g, '.')
+    extras += '.' + slugify(parsedUrl.query)
+  }
+  if (parsedUrl.hash) {
+    extras += parsedUrl.hash.replace('#', '.')
+  }
+
+  const fileName = parsedUrl.hostname + filePath + extras
+  return `data/cache/${fileName}.html`
 }
 
 /**
  * Saves page HTML into local cache file.
  */
-const cachePage = (url, content) => {
-  writeFile(cacheGetFilePath(url), content)
+const writePageMarkup = (url, content, skipExisting) => {
+  const filePath = getFilePath(url)
+  if (skipExisting && fs.existsSync(filePath)) {
+    return
+  }
+  writeFile(filePath, content)
 }
 
 module.exports = {
-  cachePage: cachePage
+  writePageMarkup: writePageMarkup
 }

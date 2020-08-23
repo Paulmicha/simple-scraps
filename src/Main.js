@@ -2,6 +2,7 @@ const puppeteer = require('puppeteer')
 const Page = require('./Page')
 const Queue = require('./Queue')
 const extract = require('./extract')
+const cache = require('./cache')
 
 /**
  * Main "simple scraps" class.
@@ -113,15 +114,10 @@ class Main {
         type: 'follow',
         selector: op.selector,
         to: op.to,
+        cache: op.cache,
         maxPagesToCrawl: ('maxPagesToCrawl' in op) ? op.maxPagesToCrawl : 0,
         conf: { ...entryPoint }
       })
-
-      if (op.cache) {
-        this.operations.addItem(entryPoint.url, {
-          type: 'cache'
-        })
-      }
     }
   }
 
@@ -157,11 +153,13 @@ class Main {
 
       switch (op.type) {
         case 'follow':
-          await this.crawl(pageWorker.page, op)
+          await this.crawl(pageWorker, op)
           break
         case 'extract':
-          console.log('process.extract : ' + url + ' / op.conf.url = ' + op.conf.url)
-          await this.extract(pageWorker.page, op)
+          if (op.cache) {
+            await this.cache(pageWorker, op)
+          }
+          await this.extract(pageWorker, op)
           break
       }
     }
@@ -197,8 +195,8 @@ class Main {
    *
    * Applies limits if set.
    */
-  async crawl (page, op) {
-    const urlsFound = await extract.linksUrl(page, op.selector)
+  async crawl (pageWorker, op) {
+    const urlsFound = await extract.linksUrl(pageWorker.page, op.selector)
     if (!urlsFound || !urlsFound.length) {
       return
     }
@@ -250,10 +248,22 @@ class Main {
   /**
    * TODO [wip] extraction process starting point.
    */
-  async extract (page, op) {
-    console.log('extraction TODO for url = ' + page.url())
-    console.log('  (from ' + op.conf.url + ')')
+  async extract (pageWorker, op) {
+    // Debug.
+    console.log('extraction TODO for url = ' + pageWorker.page.url())
+    // console.log('  (from ' + op.conf.url + ')')
     // console.log(op)
+  }
+
+  /**
+   * Caching process starting point.
+   */
+  async cache (pageWorker, op) {
+    // Debug.
+    console.log('Caching page ' + pageWorker.page.url())
+
+    const pageContent = await pageWorker.getContent()
+    cache.writePageMarkup(pageWorker.page.url(), pageContent)
   }
 }
 
