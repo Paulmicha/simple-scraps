@@ -37,6 +37,7 @@ class Main {
     }
     if (!(setting in this.config.settings)) {
       switch (setting) {
+        // TODO device emulation (i.e. mobile) ?
         case 'pageW':
           return 1280
         case 'pageH':
@@ -47,6 +48,9 @@ class Main {
           return 4
         case 'crawlDelay':
           return [500, 2500]
+        // TODO instead, leave more options inside each "follow" config. E.g.
+        // screenshot format, quality, device emulation / resolution, etc.
+        // -> Deprecated.
         case 'cacheWithScreenshot':
           return true
         case 'cacheSkipExisiting':
@@ -259,9 +263,36 @@ class Main {
    */
   async extract (pageWorker, op) {
     // Debug.
-    console.log('extraction TODO for url = ' + pageWorker.page.url())
+    // console.log('extraction TODO for url = ' + pageWorker.page.url())
     // console.log('  (from ' + op.conf.url + ')')
     // console.log(op)
+
+    if (!('to' in op)) {
+      throw Error('Error : missing extraction destination (to)')
+    }
+
+    // First, get all defined extractors that match current destination.
+    const destination = op.to.split('/')
+    const extractors = Object.keys(this.config)
+      .filter(key => key !== 'start')
+      .map(key => key.split('/'))
+      .filter(keyParts => keyParts[0] === destination[0])
+      .map(keyParts => this.config[keyParts.join('/')])
+
+    // for (let i = 0; i < extractors.length; i++) {
+    //   if (extractors[i][0] !== destination[0]) {
+    //     extractors.splice(i)
+    //   }
+    // }
+
+    console.log(extractors)
+    // console.log(destination)
+
+    // switch (destination[0]) {
+    //   case 'content':
+    //     console.log([pageWorker.page.url(), op])
+    //     break
+    // }
   }
 
   /**

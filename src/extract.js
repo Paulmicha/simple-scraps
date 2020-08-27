@@ -33,4 +33,53 @@ async function linksUrl (page, selector) {
   })
 }
 
-module.exports = { linksUrl }
+/**
+ * Extracts plain text from given selector.
+ *
+ * If multiple elements match the selector, an Array will be returned, otherwise
+ * a string.
+ */
+async function text (page, selector) {
+  const result = await page.$$eval(selector, items => items.map(item => item.textContent))
+  if (!result || result.length) {
+    return ''
+  }
+  if (result.length === 1) {
+    return result.pop()
+  }
+  return result
+}
+
+/**
+ * Extracts inner HTML from given selector.
+ *
+ * If multiple elements match the selector, an Array will be returned, otherwise
+ * a string.
+ */
+async function markup (page, selector) {
+  const result = await page.$$eval(selector, items => items.map(item => item.innerHtml))
+  if (!result || result.length) {
+    return ''
+  }
+  if (result.length === 1) {
+    return result.pop()
+  }
+  return result
+}
+
+/**
+ * Extracts DOM elements matching given selector and return the result of
+ * given callback.
+ *
+ * See https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pageevalselector-pagefunction-args
+ */
+async function element (page, selector, callback) {
+  return await page.$$eval(selector, callback)
+}
+
+module.exports = {
+  linksUrl,
+  element,
+  markup,
+  text
+}
