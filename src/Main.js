@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer')
 const Page = require('./Page')
 const Queue = require('./Queue')
+const Entity = require('./Entity')
 const extract = require('./extract')
 const cache = require('./cache')
 const fs = require('fs')
@@ -259,43 +260,6 @@ class Main {
   }
 
   /**
-   * TODO [wip] extraction process starting point.
-   */
-  async extract (pageWorker, op) {
-    // Debug.
-    // console.log('extraction TODO for url = ' + pageWorker.page.url())
-    // console.log('  (from ' + op.conf.url + ')')
-    // console.log(op)
-
-    if (!('to' in op)) {
-      throw Error('Error : missing extraction destination (to)')
-    }
-
-    // First, get all defined extractors that match current destination.
-    const destination = op.to.split('/')
-    const extractors = Object.keys(this.config)
-      .filter(key => key !== 'start')
-      .map(key => key.split('/'))
-      .filter(keyParts => keyParts[0] === destination[0])
-      .map(keyParts => this.config[keyParts.join('/')])
-
-    // for (let i = 0; i < extractors.length; i++) {
-    //   if (extractors[i][0] !== destination[0]) {
-    //     extractors.splice(i)
-    //   }
-    // }
-
-    console.log(extractors)
-    // console.log(destination)
-
-    // switch (destination[0]) {
-    //   case 'content':
-    //     console.log([pageWorker.page.url(), op])
-    //     break
-    // }
-  }
-
-  /**
    * Caching process starting point.
    */
   async cache (pageWorker, op) {
@@ -322,6 +286,38 @@ class Main {
         fullPage: true
       })
     }
+  }
+
+  /**
+   * TODO [wip] extraction process starting point.
+   */
+  async extract (pageWorker, op) {
+    // Debug.
+    // console.log('extraction TODO for url = ' + pageWorker.page.url())
+    // console.log('  (from ' + op.conf.url + ')')
+    // console.log(op)
+
+    if (!('to' in op)) {
+      throw Error('Error : missing extraction destination (to)')
+    }
+
+    // First, get all defined extractors that match current destination.
+    const destination = op.to.split('/')
+    const main = this
+    let extractors = []
+    Object.keys(this.config)
+      .filter(key => key !== 'start')
+      .map(key => key.split('/'))
+      .filter(keyParts => keyParts[0] === destination[0])
+      .map(keyParts => {
+        extractors = extractors.concat(main.config[keyParts.join('/')])
+      })
+
+    // console.log(extractors)
+
+    // Then prepare the entity that will be extracted (each extractor deals with
+    // a part of the same entity).
+    const entity = new Entity(destination[0], destination[1])
   }
 }
 

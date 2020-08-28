@@ -41,7 +41,7 @@ async function linksUrl (page, selector) {
  */
 async function text (page, selector) {
   const result = await page.$$eval(selector, items => items.map(item => item.textContent))
-  if (!result || result.length) {
+  if (!result || !result.length) {
     return ''
   }
   if (result.length === 1) {
@@ -58,7 +58,7 @@ async function text (page, selector) {
  */
 async function markup (page, selector) {
   const result = await page.$$eval(selector, items => items.map(item => item.innerHtml))
-  if (!result || result.length) {
+  if (!result || !result.length) {
     return ''
   }
   if (result.length === 1) {

@@ -2,7 +2,7 @@
 /**
  * Defines a queue of items keyed by string.
  *
- * Used to handle simultaneously opened pages and operations by URL.
+ * Used to handle operations by URL.
  */
 class Queue {
   constructor () {
