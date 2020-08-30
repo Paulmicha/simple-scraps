@@ -51,13 +51,13 @@ const config = require('./data/sessions/www.chouette.net.br.blog.json')
 
 const scraps = new SimpleScraps(config)
 
-const launch = async () => {
+const main = async () => {
   await scraps.init()
   await scraps.start()
   await scraps.stop()
 }
 
-launch()
+main()
 ```
 
 For the config file contents (`./data/sessions/www.chouette.net.br.blog.json`), see below :
@@ -104,7 +104,8 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
     {
       "selector": "article.node .field-name-field-tags > a",
       "extract": "text",
-      "as": "taxonomy/tag",
+      "as": "entity.tags",
+      "ref": "taxonomy/tag",
       "postprocess": "mapTaxonomyTagTitle"
     }
   ],

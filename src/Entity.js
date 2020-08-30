@@ -7,6 +7,14 @@ class Entity {
     this.type = type
     this.bundle = bundle
   }
+
+  setField (field, value) {
+    this[field] = value
+  }
+
+  export () {
+    return JSON.stringify(this)
+  }
 }
 
 module.exports = Entity

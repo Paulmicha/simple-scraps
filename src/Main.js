@@ -1,3 +1,4 @@
+const EventEmitter = require('events')
 const puppeteer = require('puppeteer')
 const Page = require('./Page')
 const Queue = require('./Queue')
@@ -16,8 +17,9 @@ const fs = require('fs')
  * - extract : once opened, this part is in charge of processing the pages DOM
  *    to extract structured data according to rules declared in config.
  */
-class Main {
+class Main extends EventEmitter {
   constructor (config) {
+    super()
     this.config = config
     this.pages = []
     this.openPages = {}
@@ -313,11 +315,22 @@ class Main {
         extractors = extractors.concat(main.config[keyParts.join('/')])
       })
 
+    // Debug.
     // console.log(extractors)
 
     // Then prepare the entity that will be extracted (each extractor deals with
     // a part of the same entity).
     const entity = new Entity(destination[0], destination[1])
+
+    // Chain all extractors that need to run on given page to build our entity.
+    for (let i = 0; i < extractors.length; i++) {
+      const extractor = extractors[i]
+      await extract.run(extractor, entity, pageWorker, this)
+    }
+
+    // Debug.
+    console.log('end result = ')
+    console.log(entity.export())
   }
 }
 
