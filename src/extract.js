@@ -82,6 +82,23 @@ async function element (page, selector, callback) {
 }
 
 /**
+ * Returns the extrators matching given entity type and bundle.
+ */
+async function get (entity, main) {
+  let extractors = []
+
+  Object.keys(main.config)
+    .filter(key => key !== 'start')
+    .map(key => key.split('/'))
+    .filter(keyParts => keyParts[0] === entity.type)
+    .map(keyParts => {
+      extractors = extractors.concat(main.config[keyParts.join('/')])
+    })
+
+  return extractors
+}
+
+/**
  * Runs a single extractor on given entity.
  */
 async function run (extractor, entity, pageWorker, main) {
@@ -90,11 +107,20 @@ async function run (extractor, entity, pageWorker, main) {
   const fieldParts = extractor.as.split('.')
   const field = fieldParts[1]
 
-  // TODO [wip] a single component must support multiple props. WIP.
+  // A single component must support multiple props.
+  // In this case, extractor.extract is an array.
   if (Array.isArray(extractor.extract)) {
+    const component = {}
+    while (extractor.extract.length) {
+      const componentExtrator = extractor.extract.shift()
+      componentExtrator.selector = `${extractor.selector} ${componentExtrator.selector}`
+      await this.run(componentExtrator, component, pageWorker)
+    }
+    entity.setField(field, component)
     return
   }
 
+  // "Normal" process : extractor.extract is a string.
   switch (extractor.extract) {
     case 'text':
       entity.setField(field, await this.text(pageWorker.page, extractor.selector))
@@ -109,16 +135,17 @@ async function run (extractor, entity, pageWorker, main) {
         throw Error('Error : missing extractor postprocess for ' + extractor.as + ', selector : ' + extractor.selector)
       }
 
+      // Debug.
+      // console.log(`emitting event ${extractor.postprocess}`)
+
       // Emits an event corresponding to the value of extractor.postprocess
       // which gets an object representing the extraction details, and
       // which expects it to be altered to add a callback function in its
       // 'callback' prop.
+      // Example function : items => items.map(item => item.innerHTML)
       const postProcessor = {}
       postProcessor.extractor = { ...extractor }
       postProcessor.url = pageWorker.page.url()
-
-      // Debug.
-      console.log(`emitting event ${extractor.postprocess}`)
 
       main.emit(extractor.postprocess, postProcessor)
 
@@ -150,5 +177,6 @@ module.exports = {
   element,
   markup,
   text,
+  get,
   run
 }

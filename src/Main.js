@@ -13,9 +13,8 @@ const fs = require('fs')
  * Overview :
  * - queue : contains all operations that should run before the entire process
  *  comes to an end.
- * - follow : opens URL and performs queued operation(s) associated to it.
- * - extract : once opened, this part is in charge of processing the pages DOM
- *    to extract structured data according to rules declared in config.
+ * - crawl : opens given URL and queues new operation(s) (crawl or extract).
+ * - extract : outputs structured data according to rules declared in config.
  */
 class Main extends EventEmitter {
   constructor (config) {
@@ -127,7 +126,7 @@ class Main extends EventEmitter {
       const op = entryPoint.follow[j]
 
       this.operations.addItem(entryPoint.url, {
-        type: 'follow',
+        type: 'crawl',
         selector: op.selector,
         to: op.to,
         cache: op.cache,
@@ -168,7 +167,7 @@ class Main extends EventEmitter {
       // console.log(op)
 
       switch (op.type) {
-        case 'follow':
+        case 'crawl':
           await this.crawl(pageWorker, op)
           break
         case 'extract':
@@ -251,6 +250,7 @@ class Main extends EventEmitter {
       // Execution depends on the "type" of link.
       if (op.to === 'start') {
         // Recursion (e.g. pager links).
+        // NB. createInitialOps() will set op.type = 'crawl'.
         op.conf.url = urlFound
         this.createInitialOps(op.conf)
       } else {
@@ -291,36 +291,23 @@ class Main extends EventEmitter {
   }
 
   /**
-   * TODO [wip] extraction process starting point.
+   * Extraction process starting point.
    */
   async extract (pageWorker, op) {
-    // Debug.
-    // console.log('extraction TODO for url = ' + pageWorker.page.url())
-    // console.log('  (from ' + op.conf.url + ')')
-    // console.log(op)
-
     if (!('to' in op)) {
       throw Error('Error : missing extraction destination (to)')
     }
 
-    // First, get all defined extractors that match current destination.
+    // Prepare the entity that will be extracted (each extractor deals with
+    // a part of the same entity).
     const destination = op.to.split('/')
-    const main = this
-    let extractors = []
-    Object.keys(this.config)
-      .filter(key => key !== 'start')
-      .map(key => key.split('/'))
-      .filter(keyParts => keyParts[0] === destination[0])
-      .map(keyParts => {
-        extractors = extractors.concat(main.config[keyParts.join('/')])
-      })
+    const entity = new Entity(destination[0], destination[1])
+
+    // Get all defined extractors that match current destination.
+    const extractors = extract.get(entity, this)
 
     // Debug.
     // console.log(extractors)
-
-    // Then prepare the entity that will be extracted (each extractor deals with
-    // a part of the same entity).
-    const entity = new Entity(destination[0], destination[1])
 
     // Chain all extractors that need to run on given page to build our entity.
     for (let i = 0; i < extractors.length; i++) {
@@ -329,7 +316,6 @@ class Main extends EventEmitter {
     }
 
     // Debug.
-    console.log('end result = ')
     console.log(entity.export())
   }
 }
