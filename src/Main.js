@@ -86,17 +86,17 @@ class Main extends EventEmitter {
   async start () {
     const entryPoints = this.config.start
     if (!entryPoints) {
-      throw Error('Error : missing start config')
+      throw Error('Missing start config')
     }
 
     // Begins with populating the initial URL(s) operation(s).
     for (let i = 0; i < entryPoints.length; i++) {
       const entryPoint = entryPoints[i]
       if (!entryPoint.url) {
-        throw Error('Error : missing start url')
+        throw Error('Missing start url')
       }
       if (!entryPoint.follow) {
-        throw Error('Error : missing start links to follow')
+        throw Error('Missing start links to follow')
       }
       this.createInitialOps(entryPoint)
     }
@@ -295,7 +295,7 @@ class Main extends EventEmitter {
    */
   async extract (pageWorker, op) {
     if (!('to' in op)) {
-      throw Error('Error : missing extraction destination (to)')
+      throw Error('Missing extraction destination (to)')
     }
 
     // Prepare the entity that will be extracted (each extractor deals with
@@ -306,9 +306,6 @@ class Main extends EventEmitter {
     // Get all defined extractors that match current destination.
     const extractors = extract.get(entity, this)
 
-    // Debug.
-    // console.log(extractors)
-
     // Chain all extractors that need to run on given page to build our entity.
     for (let i = 0; i < extractors.length; i++) {
       const extractor = extractors[i]
@@ -316,7 +313,8 @@ class Main extends EventEmitter {
     }
 
     // Debug.
-    console.log(entity.export())
+    // console.log(entity.export())
+    console.log(entity)
   }
 }
 

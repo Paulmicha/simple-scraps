@@ -4,6 +4,7 @@
  */
 
 const urlParse = require('url-parse')
+const Entity = require('./Entity')
 
 /**
  * Extracts absolute URLs from links matched by given selector.
@@ -84,7 +85,7 @@ async function element (page, selector, callback) {
 /**
  * Returns the extrators matching given entity type and bundle.
  */
-async function get (entity, main) {
+function get (entity, main) {
   let extractors = []
 
   Object.keys(main.config)
@@ -102,19 +103,25 @@ async function get (entity, main) {
  * Runs a single extractor on given entity.
  */
 async function run (extractor, entity, pageWorker, main) {
-  // Each extractor should output a single field value(s).
-  // TODO remove "namespaced" 'as' definitions (i.e. entity.<field>) ?
+  // Each extractor outputs a single field value(s).
+  // The 'as' syntax can support any of the following declarations :
+  // - <thing>.<prop> (ex: entity.title)
+  // - <thing>.<type>.<prop> (ex: component.Lede.text)
+  // - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
   const fieldParts = extractor.as.split('.')
-  const field = fieldParts[1]
+  let field = fieldParts[1]
+  if (fieldParts.length > 2) {
+    field = fieldParts[2]
+  }
 
-  // A single component must support multiple props.
-  // In this case, extractor.extract is an array.
+  // Support multiple props or fields. For convenience, components definitions
+  // reuse the entity class.
   if (Array.isArray(extractor.extract)) {
-    const component = {}
+    const component = new Entity(fieldParts[0], fieldParts[1])
     while (extractor.extract.length) {
       const componentExtrator = extractor.extract.shift()
       componentExtrator.selector = `${extractor.selector} ${componentExtrator.selector}`
-      await this.run(componentExtrator, component, pageWorker)
+      await this.run(componentExtrator, component, pageWorker, main)
     }
     entity.setField(field, component)
     return
@@ -132,11 +139,11 @@ async function run (extractor, entity, pageWorker, main) {
 
     case 'element': {
       if (!extractor.postprocess) {
-        throw Error('Error : missing extractor postprocess for ' + extractor.as + ', selector : ' + extractor.selector)
+        throw Error('Missing extractor postprocess for ' + extractor.as + ', selector : ' + extractor.selector)
       }
 
       // Debug.
-      // console.log(`emitting event ${extractor.postprocess}`)
+      // console.log(`emitting event extract.${extractor.postprocess}`)
 
       // Emits an event corresponding to the value of extractor.postprocess
       // which gets an object representing the extraction details, and
@@ -147,28 +154,39 @@ async function run (extractor, entity, pageWorker, main) {
       postProcessor.extractor = { ...extractor }
       postProcessor.url = pageWorker.page.url()
 
-      main.emit(extractor.postprocess, postProcessor)
+      main.emit('extract.' + extractor.postprocess, postProcessor)
 
       if (!postProcessor.callback) {
-        throw Error('Error : missing callback for element extrator ' + extractor.as + ', selector : ' + extractor.selector)
+        throw Error('Missing callback for element extrator ' + extractor.as + ', selector : ' + extractor.selector)
       }
 
       entity.setField(field, await this.element(pageWorker.page, extractor.selector, postProcessor.callback))
       break
     }
 
-    case 'components':
+    case 'components': {
       if (!('components' in main.config)) {
-        throw Error('Error : missing components definition for selector : ' + extractor.selector)
+        throw Error('Missing components definition for selector : ' + extractor.selector)
       }
+
       // For each components extractors defined in conf, recurse inside given
       // selector.
+      const components = []
+
       for (let i = 0; i < main.config.components.length; i++) {
         const subExtractor = main.config.components[i]
         subExtractor.selector = `${extractor.selector} ${subExtractor.selector}`
-        entity.setField(field, await this.run(subExtractor, entity, pageWorker))
+
+        const subFieldParts = subExtractor.as.split('.')
+        const component = new Entity(subFieldParts[0], subFieldParts[1])
+
+        await this.run(subExtractor, component, pageWorker, main)
+        components.push(component)
       }
+
+      entity.setField(field, components)
       break
+    }
   }
 }
 
