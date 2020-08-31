@@ -103,91 +103,166 @@ function get (entity, main) {
  * Runs a single extractor on given entity.
  */
 async function run (extractor, entity, pageWorker, main) {
-  // Each extractor outputs a single field value(s).
-  // The 'as' syntax can support any of the following declarations :
-  // - <thing>.<prop> (ex: entity.title)
-  // - <thing>.<type>.<prop> (ex: component.Lede.text)
-  // - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
-  const fieldParts = extractor.as.split('.')
-  let field = fieldParts[1]
-  if (fieldParts.length > 2) {
-    field = fieldParts[2]
-  }
+  const [, field] = as(extractor)
 
-  // Support multiple props or fields. For convenience, components definitions
-  // reuse the entity class.
+  // Support fields containing multiple items with props.
   if (Array.isArray(extractor.extract)) {
-    const component = new Entity(fieldParts[0], fieldParts[1])
-    while (extractor.extract.length) {
-      const componentExtrator = extractor.extract.shift()
-      componentExtrator.selector = `${extractor.selector} ${componentExtrator.selector}`
-      await this.run(componentExtrator, component, pageWorker, main)
-    }
-    entity.setField(field, component)
+    await subItemsFieldProcess(field, extractor, entity, pageWorker, main)
     return
   }
 
   // "Normal" process : extractor.extract is a string.
   switch (extractor.extract) {
     case 'text':
-      entity.setField(field, await this.text(pageWorker.page, extractor.selector))
+      entity.set(field, await text(pageWorker.page, extractor.selector))
       break
-
     case 'markup':
-      entity.setField(field, await this.markup(pageWorker.page, extractor.selector))
+      entity.set(field, await markup(pageWorker.page, extractor.selector))
       break
-
-    case 'element': {
-      if (!extractor.postprocess) {
-        throw Error('Missing extractor postprocess for ' + extractor.as + ', selector : ' + extractor.selector)
-      }
-
-      // Debug.
-      // console.log(`emitting event extract.${extractor.postprocess}`)
-
-      // Emits an event corresponding to the value of extractor.postprocess
-      // which gets an object representing the extraction details, and
-      // which expects it to be altered to add a callback function in its
-      // 'callback' prop.
-      // Example function : items => items.map(item => item.innerHTML)
-      const postProcessor = {}
-      postProcessor.extractor = { ...extractor }
-      postProcessor.url = pageWorker.page.url()
-
-      main.emit('extract.' + extractor.postprocess, postProcessor)
-
-      if (!postProcessor.callback) {
-        throw Error('Missing callback for element extrator ' + extractor.as + ', selector : ' + extractor.selector)
-      }
-
-      entity.setField(field, await this.element(pageWorker.page, extractor.selector, postProcessor.callback))
+    case 'element':
+      await elementFieldProcess(field, extractor, entity, pageWorker, main)
       break
-    }
-
-    case 'components': {
-      if (!('components' in main.config)) {
-        throw Error('Missing components definition for selector : ' + extractor.selector)
-      }
-
-      // For each components extractors defined in conf, recurse inside given
-      // selector.
-      const components = []
-
-      for (let i = 0; i < main.config.components.length; i++) {
-        const subExtractor = main.config.components[i]
-        subExtractor.selector = `${extractor.selector} ${subExtractor.selector}`
-
-        const subFieldParts = subExtractor.as.split('.')
-        const component = new Entity(subFieldParts[0], subFieldParts[1])
-
-        await this.run(subExtractor, component, pageWorker, main)
-        components.push(component)
-      }
-
-      entity.setField(field, components)
+    case 'components':
+      await componentsFieldProcess(field, extractor, entity, pageWorker, main)
       break
-    }
   }
+}
+
+/**
+ * Returns a string representing <thing>.<prop> from 'as' extractors config key.
+ *
+ * The 'as' syntax can support any of the following declarations :
+ * - <thing>.<prop> (ex: entity.title)
+ * - <thing>.<type>.<prop> (ex: component.Lede.text)
+ * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
+ */
+function as (extractor, onlyTail) {
+  const parts = extractor.as.split('.')
+
+  if (onlyTail) {
+    return parts.pop()
+  }
+
+  const thing = parts[0]
+  const type = parts[1]
+  let prop = ''
+
+  if (parts.length > 2) {
+    parts.shift()
+    parts.shift()
+    prop = parts.join('.')
+  }
+
+  return [thing, type, prop]
+}
+
+/**
+ * Sub-processes fields containing multiple items with props.
+ *
+ * Outputs a single object from multiple extractors 'as' for example :
+ * - component.MediaGrid.items[].image
+ * - component.MediaGrid.items[].title
+ * - component.MediaGrid.items[].text
+ */
+async function subItemsFieldProcess (field, extractor, entity, pageWorker, main) {
+  // const [thing, type, prop] = as(extractor)
+  // const component = new Entity(thing, type)
+  // while (extractor.extract.length) {
+  //   const componentExtrator = extractor.extract.shift()
+  //   componentExtrator.selector = `${extractor.selector} ${componentExtrator.selector}`
+  //   await run(componentExtrator, component, pageWorker, main)
+  // }
+  // entity.set(prop, component.get())
+
+  const [thing, type, prop] = as(extractor)
+  const multiFieldValues = []
+
+  while (extractor.extract.length) {
+    const componentExtrator = extractor.extract.shift()
+    componentExtrator.selector = `${extractor.selector} ${componentExtrator.selector}`
+
+    const multiFieldItemProp = as(componentExtrator, true)
+
+    const multiFieldItem = new Entity(`${thing}${type}Fragment_${prop}`, multiFieldItemProp)
+    await run(componentExtrator, multiFieldItem, pageWorker, main)
+
+    multiFieldValues.push(multiFieldItem.get())
+  }
+
+  // console.log(['multiField', multiField])
+
+  entity.set(`${thing}${type}${prop}`, multiFieldValues)
+}
+
+/**
+ * Sub-processes 'element' fields.
+ *
+ * For these, the extraction process needs to be provided via event handlers.
+ */
+async function elementFieldProcess (field, extractor, entity, pageWorker, main) {
+  if (!extractor.postprocess) {
+    throw Error('Missing extractor postprocess for ' + extractor.as + ', selector : ' + extractor.selector)
+  }
+
+  // Debug.
+  // console.log(`emitting event extract.${extractor.postprocess}`)
+
+  // Emits an event corresponding to the value of extractor.postprocess
+  // which gets an object representing the extraction details, and
+  // which expects it to be altered to add a callback function in its
+  // 'callback' prop.
+  // Example function : items => items.map(item => item.innerHTML)
+  const postProcessor = {}
+  postProcessor.extractor = { ...extractor }
+  postProcessor.url = pageWorker.page.url()
+
+  main.emit('extract.' + extractor.postprocess, postProcessor)
+
+  if (!postProcessor.callback) {
+    throw Error('Missing callback for element extrator ' + extractor.as + ', selector : ' + extractor.selector)
+  }
+
+  entity.set(field, await element(pageWorker.page, extractor.selector, postProcessor.callback))
+}
+
+/**
+ * Sub-processes 'components' fields.
+ *
+ * For these, the extraction process needs to be provided via event handler.
+ */
+async function componentsFieldProcess (field, extractor, entity, pageWorker, main) {
+  if (!('components' in main.config)) {
+    throw Error('Missing components definition for selector : ' + extractor.selector)
+  }
+
+  // For each components extractors defined in conf, recurse inside given
+  // selector.
+  const components = []
+
+  for (let i = 0; i < main.config.components.length; i++) {
+    const subExtractor = main.config.components[i]
+    subExtractor.selector = `${extractor.selector} ${subExtractor.selector}`
+
+    const [thing, type, prop] = as(subExtractor)
+    const component = new Entity(thing, `${type}_${prop}`)
+
+    await run(subExtractor, component, pageWorker, main)
+
+    // We need to transform components extration result to match expected
+    // structure.
+    // Example result :
+    //  { Lede: "<p>markup contents</p>" }
+    // Expected structure :
+    //  { c: "Lede", props: { text: "<p>markup contents</p>" }}
+    const transformedObject = {}
+    transformedObject.c = type
+    transformedObject.props = {}
+    transformedObject.props[prop] = component.get(type)
+
+    components.push(transformedObject)
+  }
+
+  entity.set(field, components)
 }
 
 module.exports = {

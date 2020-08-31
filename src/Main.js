@@ -313,8 +313,9 @@ class Main extends EventEmitter {
     }
 
     // Debug.
+    // console.log(entity.get())
+    console.log(entity.get('content'))
     // console.log(entity.export())
-    console.log(entity)
   }
 }
 
