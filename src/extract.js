@@ -103,6 +103,10 @@ function get (entity, main) {
  * Runs a single extractor on given entity.
  */
 async function run (extractor, entity, pageWorker, main) {
+  // Debug.
+  console.log('run() - extract as :')
+  console.log(as(extractor))
+
   const [, field] = as(extractor)
 
   // Support fields containing multiple items with props.
@@ -129,7 +133,7 @@ async function run (extractor, entity, pageWorker, main) {
 }
 
 /**
- * Returns a string representing <thing>.<prop> from 'as' extractors config key.
+ * Determines what field or prop the given extractor will process.
  *
  * The 'as' syntax can support any of the following declarations :
  * - <thing>.<prop> (ex: entity.title)
@@ -174,6 +178,10 @@ async function subItemsFieldProcess (field, extractor, entity, pageWorker, main)
   // }
   // entity.set(prop, component.get())
 
+  // Debug.
+  console.log(`subItemsFieldProcess(${field})`)
+  // console.log(extractor.extract)
+
   const [thing, type, prop] = as(extractor)
   const multiFieldValues = []
 
@@ -183,15 +191,43 @@ async function subItemsFieldProcess (field, extractor, entity, pageWorker, main)
 
     const multiFieldItemProp = as(componentExtrator, true)
 
+    // Debug.
+    console.log(`  ${thing} ${type} ${prop} ${multiFieldItemProp} :`)
+
     const multiFieldItem = new Entity(`${thing}${type}Fragment_${prop}`, multiFieldItemProp)
     await run(componentExtrator, multiFieldItem, pageWorker, main)
 
-    multiFieldValues.push(multiFieldItem.get())
+    // Debug.
+    // console.log(multiFieldItem.get())
+
+    // TODO group items fields into same item.
+    // if (thing === 'component') {
+    //   multiFieldValues.push(componentEntityToObject(multiFieldItem, type, prop))
+    // } else {
+    //   multiFieldValues.push(multiFieldItem.get())
+    // }
   }
 
-  // console.log(['multiField', multiField])
+  // Debug.
+  // console.log(multiFieldValues)
 
-  entity.set(`${thing}${type}${prop}`, multiFieldValues)
+  entity.set(prop, multiFieldValues)
+}
+
+/**
+ * Transforms components extration result to match expected structure.
+ *
+ * Example result :
+ *  { Lede: "<p>markup contents</p>" }
+ * Expected structure :
+ *  { c: "Lede", props: { text: "<p>markup contents</p>" }}
+ */
+function componentEntityToObject (componentEntity, type, prop) {
+  const transformedObject = {}
+  transformedObject.c = type
+  transformedObject.props = {}
+  transformedObject.props[prop] = componentEntity.get(type)
+  return transformedObject
 }
 
 /**
@@ -235,8 +271,6 @@ async function componentsFieldProcess (field, extractor, entity, pageWorker, mai
     throw Error('Missing components definition for selector : ' + extractor.selector)
   }
 
-  // For each components extractors defined in conf, recurse inside given
-  // selector.
   const components = []
 
   for (let i = 0; i < main.config.components.length; i++) {
@@ -248,18 +282,7 @@ async function componentsFieldProcess (field, extractor, entity, pageWorker, mai
 
     await run(subExtractor, component, pageWorker, main)
 
-    // We need to transform components extration result to match expected
-    // structure.
-    // Example result :
-    //  { Lede: "<p>markup contents</p>" }
-    // Expected structure :
-    //  { c: "Lede", props: { text: "<p>markup contents</p>" }}
-    const transformedObject = {}
-    transformedObject.c = type
-    transformedObject.props = {}
-    transformedObject.props[prop] = component.get(type)
-
-    components.push(transformedObject)
+    components.push(componentEntityToObject(component, type, prop))
   }
 
   entity.set(field, components)
