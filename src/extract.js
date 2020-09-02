@@ -71,11 +71,12 @@ async function element (page, selector, callback) {
 }
 
 /**
- * Returns the first item of an array if it contains only one item.
+ * Returns the first item of an array if it contains only one item, otherwise
+ * returns the array.
  */
 function arrayOrItemIfSingle (result) {
   if (!result || !result.length) {
-    return ''
+    return
   }
   if (result.length === 1) {
     return result.pop()
@@ -84,9 +85,9 @@ function arrayOrItemIfSingle (result) {
 }
 
 /**
- * Returns the extrators matching given entity type and bundle.
+ * Returns the extrators matching given entity type.
  */
-function match (entity, entityType, main) {
+function match (entityType, main) {
   let extractors = []
 
   Object.keys(main.config)
@@ -115,17 +116,19 @@ function as (extractor, onlyTail) {
     return parts.pop()
   }
 
-  const thing = parts[0]
-  const type = parts[1]
-  let prop = ''
+  // const thing = parts[0]
+  // const type = parts[1]
+  // let prop = ''
 
-  if (parts.length > 2) {
-    parts.shift()
-    parts.shift()
-    prop = parts.join('.')
-  }
+  // if (parts.length > 2) {
+  //   parts.shift()
+  //   parts.shift()
+  //   prop = parts.join('.')
+  // }
 
-  return [thing, type, prop]
+  // return [thing, type, prop]
+
+  return parts
 }
 
 /**
@@ -137,17 +140,19 @@ async function run (o) {
   const { extractor, extracted, pageWorker, main, fieldOverride } = o
 
   // Debug.
-  // console.log(o)
-  // console.log(
-  //   `run() - extract '${extractor.selector}' as ${as(extractor).join(':')}`
-  // )
+  // console.log(Object.keys(o))
+  // console.log(extractor)
+  console.log(
+    `run() - extract '${extractor.selector}' as ${as(extractor).join(':')}`
+  )
 
   // By default, the field (or property) that is being extracted is the 2nd part
   // of the "as" key, but it needs to be overridable for nested components.
   // @see as()
-  let [, field] = as(extractor)
-  if (fieldOverride) {
-    field = fieldOverride
+  const destination = as(extractor)
+  let field = fieldOverride
+  if (!field) {
+    field = destination[1]
   }
 
   // Support fields containing multiple items with props.
@@ -180,24 +185,49 @@ async function run (o) {
  * - component.MediaGrid.items[].image
  * - component.MediaGrid.items[].title
  * - component.MediaGrid.items[].text
+ *
+ * When the destination contains the string '[]', it means that we need to
+ * create an array of objects. Each object can have 1 or many fields (or props).
+ * Ex : component.MediaGrid.items[].title
+ *  -> the component has an "items" property to be extracted as an array of
+ *  objects, whose "title" is processed by a single sub-extractor run separately.
+ *
+ * When a field has a single match, its value is a string and is considered to
+ * belong to the 1st item. Hence, we need to delimit the scope of a single item
+ * otherwise if all fields do not have the same number of matches, we couldn't
+ * determine to which item the extracted values belong.
+ * -> Solution :
+ * The 'delimiter' config is a CSS selector that sets the scope of every
+ * single child item. Any element matched outside of this selector does not
+ * belong to the same item.
  */
 async function subItemsFieldProcess (o) {
   const { extractor, extracted, pageWorker, main, field } = o
 
   // Debug.
-  // console.log(`subItemsFieldProcess(${field})`)
+  console.log(`subItemsFieldProcess(${field})`)
   // console.log(extractor.extract)
 
   const subItem = {}
+  const subItemDelimiters = []
 
   while (extractor.extract.length) {
-    const subExtractor = extractor.extract.shift()
-    subExtractor.selector = `${extractor.selector} ${subExtractor.selector}`
+    const componentExtractor = extractor.extract.shift()
+    componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
 
-    const multiFieldItemProp = as(subExtractor, true)
+    const multiFieldItemProp = as(componentExtractor, true)
+
+    // Delimiters use "markers" that are directly set on the DOM element defined
+    // as scope for every single child item.
+    // It's a data-attribute containing a counter.
+    const destination = as(componentExtractor)
+    if (destination[2].indexOf('[]') !== false) {
+      // TODO (wip)
+      subItemDelimiters.push(destination[2])
+    }
 
     await run({
-      extractor: subExtractor,
+      extractor: componentExtractor,
       extracted: subItem,
       pageWorker,
       main,
@@ -206,10 +236,41 @@ async function subItemsFieldProcess (o) {
   }
 
   // Debug.
+  console.log(`  TODO (wip) implement delimiters for ${subItemDelimiters.join(', ')}`)
+
+  // Debug.
   // console.log('  subItem :')
   // console.log(subItem)
 
-  extracted[field] = subItem
+  // At this point, the subItem object has the following structure :
+  //  { <field_1>: 'value 1', <field_2>: ['value 2.1', 'value 2.2'] }
+  // What we need is the following :
+  //  [
+  //    { <field_1>: 'value 1', <field_2>: 'value 2.1' },
+  //    { <field_2>: 'value 2.2' }
+  //  ]
+  const subItems = []
+  Object.keys(subItem).forEach(key => {
+    if (Array.isArray(subItem[key])) {
+      subItem[key].forEach((value, i) => {
+        if (!subItems[i]) {
+          subItems[i] = {}
+        }
+        subItems[i][key] = value
+      })
+    } else {
+      if (!subItems[0]) {
+        subItems[0] = {}
+      }
+      subItems[0][key] = subItem[key]
+    }
+  })
+
+  // Debug.
+  // console.log('  subItems :')
+  // console.log(subItems)
+
+  extracted[field] = subItems
 }
 
 /**
@@ -249,6 +310,15 @@ async function elementFieldProcess (o) {
 
 /**
  * Sub-processes 'components' fields.
+ *
+ * Some component extractors have a single prop destination, e.g. :
+ *  "as": "component.Lede.text"
+ * In this case, the resulting object is completed in a single run.
+ *
+ * Other components may define multiple extractors to complete their object. In
+ * this case, the "extract" key would contain an array (of extractors), and the
+ * destination would be e.g. :
+ *  "as": "component.MediaGrid"
  */
 async function componentsFieldProcess (o) {
   const { extractor, extracted, pageWorker, main, field } = o
@@ -260,21 +330,83 @@ async function componentsFieldProcess (o) {
   const components = []
 
   for (let i = 0; i < main.config.components.length; i++) {
-    const subExtractor = main.config.components[i]
-    subExtractor.selector = `${extractor.selector} ${subExtractor.selector}`
+    const componentExtractor = main.config.components[i]
+    componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
 
     const component = {}
-    const [, type, prop] = as(subExtractor)
+    const [, type, prop] = as(componentExtractor)
 
-    await run({
-      extractor: subExtractor,
-      extracted: component,
-      pageWorker,
-      main,
-      fieldOverride: prop
-    })
+    // const destination = as(componentExtractor)
+    // const type = destination[1]
+    // const field = destination[1] || destination[2]
 
-    components.push(componentEntityToObject(component, type, prop))
+    // For components having a single prop to extract, e.g. :
+    //  "as": "component.Lede.text"
+    // we can handle these in a single run.
+    // Otherwise, the "extract" key contains an array of sub-extractors which
+    // must all run on the same component object.
+    if (!Array.isArray(componentExtractor.extract)) {
+      await run({
+        extractor: componentExtractor,
+        extracted: component,
+        pageWorker,
+        main,
+        fieldOverride: prop
+      })
+      components.push(componentEntityToObject(component, type, prop))
+    } else {
+      // We need to regroup sub-extractors to differenciate fields containing
+      // multiple values (each value requiring its own extractor run) from
+      // simpler ones (that can be dealt with in a single run).
+      const regroupedExtractors = {}
+
+      while (componentExtractor.extract.length) {
+        const subExtractor = componentExtractor.extract.shift()
+        const destination = as(subExtractor)
+        let groupBy = destination[2]
+        if (destination[2].indexOf('[]') !== false) {
+          groupBy = destination[2].replace('[]', '')
+        }
+        if (!(groupBy in regroupedExtractors)) {
+          regroupedExtractors[groupBy] = []
+        }
+        regroupedExtractors[groupBy].push(subExtractor)
+      }
+
+      // TODO [wip] at this stage, we have :
+      // regroupedExtractors = {
+      //   items: [
+      //     extractor object / as : 'component.MediaGrid.items[].image',
+      //     extractor object / as : 'component.MediaGrid.items[].title',
+      //     extractor object / as : 'component.MediaGrid.items[].text'
+      //   ]
+      // }
+
+      // const fields = Object.keys(regroupedExtractors)
+
+      // for (let i = 0; i < fields.length; i++) {
+      //   const subField = fields[i]
+
+      //   for (let j = 0; j < regroupedExtractors[subField].length; j++) {
+      //     const subExtractor = regroupedExtractors[subField][j]
+
+      //     // Debug.
+      //     console.log('  subField, subExtractor :')
+      //     console.log(subField)
+      //     console.log(subExtractor)
+
+      //     await run({
+      //       extractor: subExtractor,
+      //       extracted: component,
+      //       pageWorker,
+      //       main,
+      //       fieldOverride: subField
+      //     })
+      //   }
+      // }
+
+      // components.push(componentEntityToObject(component, type, fields))
+    }
   }
 
   extracted[field] = components

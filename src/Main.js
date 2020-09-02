@@ -303,7 +303,7 @@ class Main extends EventEmitter {
     const entity = {}
 
     // Get all defined extractors that match current destination.
-    const extractors = extract.match(entity, entityType, this)
+    const extractors = extract.match(entityType, this)
 
     // Chain all extractors that need to run on given page to build our entity.
     for (let i = 0; i < extractors.length; i++) {
@@ -314,8 +314,8 @@ class Main extends EventEmitter {
     // Debug.
     // console.log(`Main - resulting entity object (${entityType}.${bundle}) :`)
     // console.log(entity)
-    console.log(`Main - resulting entity object (${entityType}.${bundle}) *content* :`)
-    console.log(entity.content)
+    console.log(`Main - resulting entity object (${entityType}.${bundle}) *content[1]* :`)
+    console.log(entity.content[1])
   }
 }
 
