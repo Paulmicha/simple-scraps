@@ -105,7 +105,7 @@ function match (entityType, main) {
  * Determines what field or prop the given extractor will process.
  *
  * The extract 'as' syntax can support any of the following declarations :
- * - <thing>.<prop> (ex: entity.title)
+ * - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
  * - <thing>.<type>.<prop> (ex: component.Lede.text)
  * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
  */
@@ -115,18 +115,6 @@ function as (extractor, onlyTail) {
   if (onlyTail) {
     return parts.pop()
   }
-
-  // const thing = parts[0]
-  // const type = parts[1]
-  // let prop = ''
-
-  // if (parts.length > 2) {
-  //   parts.shift()
-  //   parts.shift()
-  //   prop = parts.join('.')
-  // }
-
-  // return [thing, type, prop]
 
   return parts
 }
@@ -334,11 +322,7 @@ async function componentsFieldProcess (o) {
     componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
 
     const component = {}
-    const [, type, prop] = as(componentExtractor)
-
-    // const destination = as(componentExtractor)
-    // const type = destination[1]
-    // const field = destination[1] || destination[2]
+    const [thing, type, prop] = as(componentExtractor)
 
     // For components having a single prop to extract, e.g. :
     //  "as": "component.Lede.text"
@@ -364,48 +348,96 @@ async function componentsFieldProcess (o) {
         const subExtractor = componentExtractor.extract.shift()
         const destination = as(subExtractor)
         let groupBy = destination[2]
+
         if (destination[2].indexOf('[]') !== false) {
           groupBy = destination[2].replace('[]', '')
         }
         if (!(groupBy in regroupedExtractors)) {
           regroupedExtractors[groupBy] = []
         }
+
         regroupedExtractors[groupBy].push(subExtractor)
       }
 
-      // TODO [wip] at this stage, we have :
-      // regroupedExtractors = {
-      //   items: [
-      //     extractor object / as : 'component.MediaGrid.items[].image',
-      //     extractor object / as : 'component.MediaGrid.items[].title',
-      //     extractor object / as : 'component.MediaGrid.items[].text'
-      //   ]
-      // }
+      // For example, at this stage, we would have something like :
+      //  regroupedExtractors = {
+      //    items: [
+      //      { as : 'component.MediaGrid.items[].image', ... <rest of extractor definition> },
+      //      { as : 'component.MediaGrid.items[].title', ... <rest of extractor definition> },
+      //      { as : 'component.MediaGrid.items[].text', ... <rest of extractor definition> }
+      //    ],
+      //    variant: [
+      //      { as : 'component.MediaGrid.variant', ... <rest of extractor definition> }
+      //    ]
+      //  }
 
-      // const fields = Object.keys(regroupedExtractors)
+      // So now, we need to generate 1 extractor definition per prop to match
+      // what is expected in the run() function :
+      //
+      //  subExtractorForItemsProp = {
+      //    selector: <Here we use the CSS selector of the scope delimiter
+      //      from the grouped extractors of the sub-item if available, else
+      //      we take the one from the component which then acts as the
+      //      fallback scope>,
+      //    extract: [
+      //      { as : 'component.MediaGrid.items[].image', ... <rest of extractor definition> },
+      //      { as : 'component.MediaGrid.items[].title', ... <rest of extractor definition> },
+      //      { as : 'component.MediaGrid.items[].text', ... <rest of extractor definition> }
+      //    ],
+      //    as: 'component.MediaGrid.items',
+      //    ... <any other keys, e.g. 'postprocess'>
+      //  }
+      //
+      //  subExtractorForVariantProp = {
+      //    selector: <idem>,
+      //    extract: <use the value from 'variant' prop extractor definition>,
+      //    as : 'component.MediaGrid.variant',
+      //    ... <any other keys, e.g. 'postprocess'>
+      //  }
+      const fields = Object.keys(regroupedExtractors)
 
-      // for (let i = 0; i < fields.length; i++) {
-      //   const subField = fields[i]
+      // Debug.
+      console.log('fields :')
+      console.log(fields)
 
-      //   for (let j = 0; j < regroupedExtractors[subField].length; j++) {
-      //     const subExtractor = regroupedExtractors[subField][j]
+      for (let i = 0; i < fields.length; i++) {
+        const field = fields[i]
+        const subExtractors = regroupedExtractors[field]
+        const newExtractor = {}
 
-      //     // Debug.
-      //     console.log('  subField, subExtractor :')
-      //     console.log(subField)
-      //     console.log(subExtractor)
+        // TODO (wip)
+        newExtractor.as = `${thing}.${type}.${field}`
 
-      //     await run({
-      //       extractor: subExtractor,
-      //       extracted: component,
-      //       pageWorker,
-      //       main,
-      //       fieldOverride: subField
-      //     })
-      //   }
-      // }
+        // Selector fallback : use the component's extractor value. Then look
+        // for a 'delimiter' key in child extractor(s) definition(s) if
+        // available.
+        newExtractor.selector = componentExtractor.selector
+        subExtractors.forEach(ex => {
+          if ('delimiter' in ex) {
+            newExtractor.selector = ex.delimiter
+          }
+        })
 
-      // components.push(componentEntityToObject(component, type, fields))
+        // Debug.
+        console.log('newExtractor :')
+        console.log(newExtractor)
+        // console.log('extractors :')
+        // console.log(regroupedExtractors[field].map(e => e.as))
+
+        // await run({
+        //   extractor: regroupedExtractors[field],
+        //   extracted: component,
+        //   pageWorker,
+        //   main,
+        //   fieldOverride: field
+        // })
+      }
+
+      // Debug.
+      console.log('component :')
+      console.log(component)
+
+      components.push(componentEntityToObject(component, type, fields))
     }
   }
 
