@@ -196,7 +196,13 @@ async function subItemsFieldProcess (o) {
 
     const multiFieldItemProp = as(subExtractor, true)
 
-    await run({ extractor: subExtractor, extracted: subItem, pageWorker, main, fieldOverride: multiFieldItemProp })
+    await run({
+      extractor: subExtractor,
+      extracted: subItem,
+      pageWorker,
+      main,
+      fieldOverride: multiFieldItemProp
+    })
   }
 
   // Debug.
@@ -238,14 +244,11 @@ async function elementFieldProcess (o) {
     throw Error('Missing callback for element extrator ' + extractor.as + ', selector : ' + extractor.selector)
   }
 
-  // extracted.set(field, await element(pageWorker.page, extractor.selector, postProcessor.callback))
   extracted[field] = await element(pageWorker.page, extractor.selector, postProcessor.callback)
 }
 
 /**
  * Sub-processes 'components' fields.
- *
- * For these, the extraction process needs to be provided via event handler.
  */
 async function componentsFieldProcess (o) {
   const { extractor, extracted, pageWorker, main, field } = o
@@ -260,17 +263,20 @@ async function componentsFieldProcess (o) {
     const subExtractor = main.config.components[i]
     subExtractor.selector = `${extractor.selector} ${subExtractor.selector}`
 
-    // const [thing, type, prop] = as(subExtractor)
-    const [, type, prop] = as(subExtractor)
-    // const component = new Entity(thing, `${type}_${prop}`)
     const component = {}
+    const [, type, prop] = as(subExtractor)
 
-    await run({ extractor: subExtractor, extracted: component, pageWorker, main, fieldOverride: prop })
+    await run({
+      extractor: subExtractor,
+      extracted: component,
+      pageWorker,
+      main,
+      fieldOverride: prop
+    })
 
     components.push(componentEntityToObject(component, type, prop))
   }
 
-  // extracted.set(field, components)
   extracted[field] = components
 }
 
@@ -294,11 +300,6 @@ function componentEntityToObject (componentEntity, type, prop) {
   } else {
     transformedObject.props[prop] = componentEntity[prop]
   }
-
-  // Debug.
-  // console.log(`componentEntityToObject(<componentEntity>, '${type}', '${prop}')`)
-  // console.log(componentEntity.get())
-  // console.log(transformedObject)
 
   return transformedObject
 }
