@@ -4,7 +4,7 @@
  */
 
 const urlParse = require('url-parse')
-const Entity = require('./Entity')
+// const Entity = require('./Entity')
 
 /**
  * Extracts absolute URLs from links matched by given selector.
@@ -85,13 +85,13 @@ async function element (page, selector, callback) {
 /**
  * Returns the extrators matching given entity type and bundle.
  */
-function get (entity, main) {
+function match (entity, entityType, main) {
   let extractors = []
 
   Object.keys(main.config)
     .filter(key => key !== 'start')
     .map(key => key.split('/'))
-    .filter(keyParts => keyParts[0] === entity.type)
+    .filter(keyParts => keyParts[0] === entityType)
     .map(keyParts => {
       extractors = extractors.concat(main.config[keyParts.join('/')])
     })
@@ -100,42 +100,9 @@ function get (entity, main) {
 }
 
 /**
- * Runs a single extractor on given entity.
- */
-async function run (extractor, entity, pageWorker, main) {
-  // Debug.
-  console.log('run() - extract as :')
-  console.log(as(extractor))
-
-  const [, field] = as(extractor)
-
-  // Support fields containing multiple items with props.
-  if (Array.isArray(extractor.extract)) {
-    await subItemsFieldProcess(field, extractor, entity, pageWorker, main)
-    return
-  }
-
-  // "Normal" process : extractor.extract is a string.
-  switch (extractor.extract) {
-    case 'text':
-      entity.set(field, await text(pageWorker.page, extractor.selector))
-      break
-    case 'markup':
-      entity.set(field, await markup(pageWorker.page, extractor.selector))
-      break
-    case 'element':
-      await elementFieldProcess(field, extractor, entity, pageWorker, main)
-      break
-    case 'components':
-      await componentsFieldProcess(field, extractor, entity, pageWorker, main)
-      break
-  }
-}
-
-/**
  * Determines what field or prop the given extractor will process.
  *
- * The 'as' syntax can support any of the following declarations :
+ * The extract 'as' syntax can support any of the following declarations :
  * - <thing>.<prop> (ex: entity.title)
  * - <thing>.<type>.<prop> (ex: component.Lede.text)
  * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
@@ -161,6 +128,52 @@ function as (extractor, onlyTail) {
 }
 
 /**
+ * Runs a single extractor.
+ *
+ * This is called recursively to allow nested components extraction.
+ */
+async function run (extractor, extracted, pageWorker, main, fieldOverride) {
+  // Debug.
+  console.log(
+    `run() - extract '${extractor.selector}' as ${as(extractor).join(':')}`
+  )
+
+  // By default, the field (or property) that is being extracted is the 2nd part
+  // of the "as" key, but it needs to be overridable for nested components.
+  // @see as()
+  let [, field] = as(extractor)
+  if (fieldOverride) {
+    field = fieldOverride
+
+    // Debug.
+    console.log(`  field override : ${fieldOverride}`)
+  }
+  console.log(`  -> field : ${field}`)
+
+  // Support fields containing multiple items with props.
+  if (Array.isArray(extractor.extract)) {
+    await subItemsFieldProcess(field, extractor, extracted, pageWorker, main)
+    return
+  }
+
+  // "Normal" process : extractor.extract is a string.
+  switch (extractor.extract) {
+    case 'text':
+      extracted[field] = await text(pageWorker.page, extractor.selector)
+      break
+    case 'markup':
+      extracted[field] = await markup(pageWorker.page, extractor.selector)
+      break
+    case 'element':
+      await elementFieldProcess(field, extractor, extracted, pageWorker, main)
+      break
+    case 'components':
+      await componentsFieldProcess(field, extractor, extracted, pageWorker, main)
+      break
+  }
+}
+
+/**
  * Sub-processes fields containing multiple items with props.
  *
  * Outputs a single object from multiple extractors 'as' for example :
@@ -168,65 +181,80 @@ function as (extractor, onlyTail) {
  * - component.MediaGrid.items[].title
  * - component.MediaGrid.items[].text
  */
-async function subItemsFieldProcess (field, extractor, entity, pageWorker, main) {
-  // const [thing, type, prop] = as(extractor)
-  // const component = new Entity(thing, type)
-  // while (extractor.extract.length) {
-  //   const componentExtrator = extractor.extract.shift()
-  //   componentExtrator.selector = `${extractor.selector} ${componentExtrator.selector}`
-  //   await run(componentExtrator, component, pageWorker, main)
-  // }
-  // entity.set(prop, component.get())
-
+async function subItemsFieldProcess (field, extractor, extracted, pageWorker, main) {
   // Debug.
   console.log(`subItemsFieldProcess(${field})`)
   // console.log(extractor.extract)
 
-  const [thing, type, prop] = as(extractor)
-  const multiFieldValues = []
+  // const [thing, type, prop] = as(extractor)
+  // const [, , prop] = as(extractor)
+  // const multiFieldValues = {}
+  const subItem = {}
 
   while (extractor.extract.length) {
-    const componentExtrator = extractor.extract.shift()
-    componentExtrator.selector = `${extractor.selector} ${componentExtrator.selector}`
-
-    const multiFieldItemProp = as(componentExtrator, true)
+    const subExtractor = extractor.extract.shift()
 
     // Debug.
-    console.log(`  ${thing} ${type} ${prop} ${multiFieldItemProp} :`)
+    console.log('  subExtractor :')
+    console.log(subExtractor)
 
-    const multiFieldItem = new Entity(`${thing}${type}Fragment_${prop}`, multiFieldItemProp)
-    await run(componentExtrator, multiFieldItem, pageWorker, main)
+    subExtractor.selector = `${extractor.selector} ${subExtractor.selector}`
+
+    const multiFieldItemProp = as(subExtractor, true)
+
+    // Debug.
+    // console.log(`  ${thing} ${type} ${prop} ${multiFieldItemProp} :`)
+
+    // const multiFieldItem = new Entity(`${thing}${type}Fragment_${prop}`, multiFieldItemProp)
+    // const multiFieldItem = {}
+    await run(subExtractor, subItem, pageWorker, main, extractor.selector, multiFieldItemProp)
 
     // Debug.
     // console.log(multiFieldItem.get())
 
-    // TODO group items fields into same item.
-    // if (thing === 'component') {
-    //   multiFieldValues.push(componentEntityToObject(multiFieldItem, type, prop))
-    // } else {
-    //   multiFieldValues.push(multiFieldItem.get())
-    // }
+    // multiFieldValues[multiFieldItemProp] = multiFieldItem[multiFieldItemProp]
   }
 
   // Debug.
+  // console.log('  multiFieldValues :')
   // console.log(multiFieldValues)
+  console.log('  subItem :')
+  console.log(subItem)
 
-  entity.set(prop, multiFieldValues)
+  // if (thing === 'component') {
+  // }
+
+  // extracted.set(prop, multiFieldValues)
+  // extracted[prop] = multiFieldValues
+  extracted[field] = subItem
 }
 
 /**
  * Transforms components extration result to match expected structure.
  *
- * Example result :
+ * Example extration result (input) :
  *  { Lede: "<p>markup contents</p>" }
- * Expected structure :
+ * Expected structure (output) :
  *  { c: "Lede", props: { text: "<p>markup contents</p>" }}
  */
 function componentEntityToObject (componentEntity, type, prop) {
   const transformedObject = {}
   transformedObject.c = type
   transformedObject.props = {}
-  transformedObject.props[prop] = componentEntity.get(type)
+
+  if (Array.isArray(prop)) {
+    prop.forEach(p => {
+      transformedObject.props[p] = componentEntity[p]
+    })
+  } else {
+    transformedObject.props[prop] = componentEntity[prop]
+  }
+
+  // Debug.
+  // console.log(`componentEntityToObject(<componentEntity>, '${type}', '${prop}')`)
+  // console.log(componentEntity.get())
+  // console.log(transformedObject)
+
   return transformedObject
 }
 
@@ -235,7 +263,7 @@ function componentEntityToObject (componentEntity, type, prop) {
  *
  * For these, the extraction process needs to be provided via event handlers.
  */
-async function elementFieldProcess (field, extractor, entity, pageWorker, main) {
+async function elementFieldProcess (field, extractor, extracted, pageWorker, main) {
   if (!extractor.postprocess) {
     throw Error('Missing extractor postprocess for ' + extractor.as + ', selector : ' + extractor.selector)
   }
@@ -258,7 +286,8 @@ async function elementFieldProcess (field, extractor, entity, pageWorker, main) 
     throw Error('Missing callback for element extrator ' + extractor.as + ', selector : ' + extractor.selector)
   }
 
-  entity.set(field, await element(pageWorker.page, extractor.selector, postProcessor.callback))
+  // extracted.set(field, await element(pageWorker.page, extractor.selector, postProcessor.callback))
+  extracted[field] = await element(pageWorker.page, extractor.selector, postProcessor.callback)
 }
 
 /**
@@ -266,7 +295,7 @@ async function elementFieldProcess (field, extractor, entity, pageWorker, main) 
  *
  * For these, the extraction process needs to be provided via event handler.
  */
-async function componentsFieldProcess (field, extractor, entity, pageWorker, main) {
+async function componentsFieldProcess (field, extractor, extracted, pageWorker, main) {
   if (!('components' in main.config)) {
     throw Error('Missing components definition for selector : ' + extractor.selector)
   }
@@ -277,15 +306,18 @@ async function componentsFieldProcess (field, extractor, entity, pageWorker, mai
     const subExtractor = main.config.components[i]
     subExtractor.selector = `${extractor.selector} ${subExtractor.selector}`
 
-    const [thing, type, prop] = as(subExtractor)
-    const component = new Entity(thing, `${type}_${prop}`)
+    // const [thing, type, prop] = as(subExtractor)
+    const [, type, prop] = as(subExtractor)
+    // const component = new Entity(thing, `${type}_${prop}`)
+    const component = {}
 
     await run(subExtractor, component, pageWorker, main)
 
     components.push(componentEntityToObject(component, type, prop))
   }
 
-  entity.set(field, components)
+  // extracted.set(field, components)
+  extracted[field] = components
 }
 
 module.exports = {
@@ -293,6 +325,6 @@ module.exports = {
   element,
   markup,
   text,
-  get,
+  match,
   run
 }

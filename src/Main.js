@@ -2,7 +2,7 @@ const EventEmitter = require('events')
 const puppeteer = require('puppeteer')
 const Page = require('./Page')
 const Queue = require('./Queue')
-const Entity = require('./Entity')
+// const Entity = require('./Entity')
 const extract = require('./extract')
 const cache = require('./cache')
 const fs = require('fs')
@@ -300,11 +300,13 @@ class Main extends EventEmitter {
 
     // Prepare the entity that will be extracted (each extractor deals with
     // a part of the same entity).
-    const destination = op.to.split('/')
-    const entity = new Entity(destination[0], destination[1])
+    // const destination = op.to.split('/')
+    // const entity = new Entity(destination[0], destination[1])
+    const [entityType, bundle] = op.to.split('/')
+    const entity = {}
 
     // Get all defined extractors that match current destination.
-    const extractors = extract.get(entity, this)
+    const extractors = extract.match(entity, entityType, this)
 
     // Chain all extractors that need to run on given page to build our entity.
     for (let i = 0; i < extractors.length; i++) {
@@ -314,9 +316,11 @@ class Main extends EventEmitter {
 
     // Debug.
     // console.log(entity.get())
-    console.log('content :')
-    console.log(entity.get('content'))
+    // console.log('Main - extracted entity content :')
+    // console.log(entity.get('content'))
     // console.log(entity.export())
+    console.log(`Main - resulting entity object (${entityType}.${bundle}) :`)
+    console.log(entity)
   }
 }
 
