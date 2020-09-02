@@ -311,7 +311,7 @@ class Main extends EventEmitter {
     // Chain all extractors that need to run on given page to build our entity.
     for (let i = 0; i < extractors.length; i++) {
       const extractor = extractors[i]
-      await extract.run(extractor, entity, pageWorker, this)
+      await extract.run({ extractor, extracted: entity, pageWorker, main: this })
     }
 
     // Debug.
