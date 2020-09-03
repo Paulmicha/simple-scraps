@@ -27,7 +27,7 @@ const saveExtractionResult = async (entity, entityType, bundle, pageWorker, main
 
   // Fallback to default storage if no provider was found.
   if (!('store' in storage)) {
-    const filePath = entityToFilePath('data/output', url, entityType, bundle)
+    const filePath = entityToFilePath('data/output', null, url, entityType, bundle)
 
     if (main.getSetting('outputSkipExisiting') && fs.existsSync(filePath)) {
       return
