@@ -18,7 +18,7 @@ const { entityToFilePath } = require('./utils/default_storage')
  *  pluggable storage process.
  * @return {boolean} Success flag.
  */
-const saveExtractionResult = async (entity, pageWorker, main) => {
+const saveExtractionResult = async (entity, entityType, bundle, pageWorker, main) => {
   const storage = {}
   const url = pageWorker.page.url()
 
@@ -27,7 +27,7 @@ const saveExtractionResult = async (entity, pageWorker, main) => {
 
   // Fallback to default storage if no provider was found.
   if (!('store' in storage)) {
-    const filePath = entityToFilePath('data/output', url)
+    const filePath = entityToFilePath('data/output', url, entityType, bundle)
 
     if (main.getSetting('outputSkipExisiting') && fs.existsSync(filePath)) {
       return
@@ -38,7 +38,7 @@ const saveExtractionResult = async (entity, pageWorker, main) => {
   }
 
   // Otherwise, call the provider implementation.
-  storage.store({ url, entity, pageWorker, main })
+  return storage.store({ url, entity, pageWorker, main })
 }
 
 module.exports = {

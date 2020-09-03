@@ -41,7 +41,7 @@ const savePageMarkup = async (pageWorker, main) => {
   }
 
   // Otherwise, call the provider implementation.
-  storage.store({ url, content, pageWorker, main })
+  return storage.store({ url, content, pageWorker, main })
 }
 
 /**
@@ -76,7 +76,7 @@ const screenshot = async (pageWorker, main) => {
   }
 
   // Otherwise, call the provider implementation.
-  storage.store({ url, pageWorker, main })
+  return storage.store({ url, pageWorker, main })
 }
 
 module.exports = {

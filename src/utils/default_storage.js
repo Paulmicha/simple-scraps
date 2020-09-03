@@ -47,10 +47,11 @@ const urlToFilePath = (dir, url, suffix) => {
  *
  * @param {string} dir Where to write. No trailing slash.
  * @param {string} url of crawled page.
- * @param {object} entity to store.
+ * @param {string} entityType of object to store.
+ * @param {string} bundle (optional) of object to store.
  * @return {string} The generated file path.
  */
-const entityToFilePath = (dir, url, entity, main) => {
+const entityToFilePath = (dir, url, entityType, bundle) => {
   // TODO (wip) entities will need paths like :
   //  - block/the_block_id.json
   //  - page/my-page-slug.json

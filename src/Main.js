@@ -4,6 +4,7 @@ const Page = require('./Page')
 const Queue = require('./Queue')
 const extract = require('./extract')
 const cache = require('./cache')
+const output = require('./output')
 
 /**
  * Main "simple scraps" class.
@@ -301,8 +302,10 @@ class Main extends EventEmitter {
     // Debug.
     // console.log(`Main - resulting entity object (${entityType}.${bundle}) :`)
     // console.log(entity)
-    console.log(`Main - resulting entity object (${entityType}.${bundle}) *content[1].props* :`)
-    console.log(entity.content[1].props)
+    // console.log(`Main - resulting entity object (${entityType}.${bundle}) *content[1].props* :`)
+    // console.log(entity.content[1].props)
+
+    await output.saveExtractionResult(entity, entityType, bundle, pageWorker, this)
   }
 }
 
