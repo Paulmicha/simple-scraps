@@ -4,7 +4,6 @@ const Page = require('./Page')
 const Queue = require('./Queue')
 const extract = require('./extract')
 const cache = require('./cache')
-const fs = require('fs')
 
 /**
  * Main "simple scraps" class.
@@ -55,6 +54,13 @@ class Main extends EventEmitter {
         case 'cacheWithScreenshot':
           return true
         case 'cacheSkipExisiting':
+          return true
+        case 'beautifyHtml':
+          return true
+        // TODO instead of boolean setting, use enum or something pluggable to
+        // support different strategies to deal with previously extracted
+        // objects (during reruns).
+        case 'outputSkipExisiting':
           return true
       }
     }
@@ -261,31 +267,12 @@ class Main extends EventEmitter {
   }
 
   /**
-   * Caching process starting point.
+   * Caching process (optional).
    */
   async cache (pageWorker, op) {
-    const url = pageWorker.page.url()
-
-    // Debug.
-    // console.log('Caching page ' + url)
-
-    // Save page markup.
-    const pageContent = await pageWorker.getContent()
-    cache.writePageMarkup(url, pageContent, this.getSetting('cacheSkipExisiting'))
-
-    // Save a screenshot.
+    await cache.savePageMarkup(pageWorker, this)
     if (this.getSetting('cacheWithScreenshot')) {
-      let suffix = '.screenshot-'
-      suffix += this.getSetting('pageW') + 'x' + this.getSetting('pageH')
-      suffix += '.png'
-      const filePath = cache.getFilePath(url, suffix)
-      if (this.getSetting('cacheSkipExisiting') && fs.existsSync(filePath)) {
-        return
-      }
-      await pageWorker.page.screenshot({
-        path: filePath,
-        fullPage: true
-      })
+      await cache.screenshot(pageWorker, this)
     }
   }
 
@@ -314,8 +301,8 @@ class Main extends EventEmitter {
     // Debug.
     // console.log(`Main - resulting entity object (${entityType}.${bundle}) :`)
     // console.log(entity)
-    console.log(`Main - resulting entity object (${entityType}.${bundle}) *content[1]* :`)
-    console.log(entity.content[1])
+    console.log(`Main - resulting entity object (${entityType}.${bundle}) *content[1].props* :`)
+    console.log(entity.content[1].props)
   }
 }
 

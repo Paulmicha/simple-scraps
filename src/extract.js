@@ -41,7 +41,9 @@ async function linksUrl (page, selector) {
  */
 async function text (page, selector) {
   return arrayOrItemIfSingle(
-    await page.$$eval(selector, items => items.map(item => item.textContent))
+    await page.$$eval(selector, items => items.map(
+      item => item.textContent.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
+    ))
   )
 }
 
@@ -53,7 +55,9 @@ async function text (page, selector) {
  */
 async function markup (page, selector) {
   return arrayOrItemIfSingle(
-    await page.$$eval(selector, items => items.map(item => item.innerHTML))
+    await page.$$eval(selector, items => items.map(
+      item => item.innerHTML.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
+    ))
   )
 }
 
@@ -174,6 +178,9 @@ async function run (o) {
  * - component.MediaGrid.items[].title
  * - component.MediaGrid.items[].text
  *
+ * TODO (wip) write tests for deeper nesting levels, e.g. :
+ * - component.MediaGrid.items[].nested[].value
+ *
  * When the destination contains the string '[]', it means that we need to
  * create an array of objects. Each object can have 1 or many fields (or props).
  * Ex : component.MediaGrid.items[].title
@@ -206,13 +213,20 @@ async function subItemsFieldProcess (o) {
     const multiFieldItemProp = as(componentExtractor, true)
 
     // Delimiters use "markers" that are directly set on the DOM element defined
-    // as scope for every single child item.
-    // It's a data-attribute containing a counter.
+    // as scope for every single child item. They are data-attribute containing
+    // a counter.
     const destination = as(componentExtractor)
-    if (destination[2].indexOf('[]') !== false) {
-      // TODO (wip)
-      subItemDelimiters.push(destination[2])
-    }
+
+    // TODO (wip) this will be implemented when we write tests.
+    // const destArrCursors = []
+    // destination.forEach((fragment, i) => {
+    //   if (fragment.indexOf('[]') !== false) {
+    //     destArrCursors.push(i)
+    //   }
+    // })
+
+    // Debug.
+    subItemDelimiters.push(destination.join('.'))
 
     await run({
       extractor: componentExtractor,
@@ -281,13 +295,13 @@ async function elementFieldProcess (o) {
   }
 
   // Debug.
-  // console.log(`emitting event extract.${extractor.postprocess}`)
+  // console.log(`emitting event '${extractor.postprocess}'`)
 
   const postProcessor = {}
   postProcessor.extractor = { ...extractor }
   postProcessor.url = pageWorker.page.url()
 
-  main.emit('extract.' + extractor.postprocess, postProcessor)
+  main.emit(extractor.postprocess, postProcessor)
 
   if (!postProcessor.callback) {
     throw Error('Missing callback for element extrator ' + extractor.as + ', selector : ' + extractor.selector)
@@ -370,7 +384,7 @@ async function componentsFieldProcess (o) {
       //      { as : 'component.MediaGrid.variant', ... <rest of extractor definition> }
       //    ]
       //  }
-
+      //
       // So now, we need to generate 1 extractor definition per prop to match
       // what is expected in the run() function :
       //
@@ -414,15 +428,13 @@ async function componentsFieldProcess (o) {
           newExtractor = subExtractors.pop()
         } else {
           // Selector fallback : use the component's extractor value. Then look
-          // for a 'delimiter' key in child extractor(s) definition(s) if
-          // available.
+          // for a 'delimiter' key in child extractors if available.
           newExtractor.selector = componentExtractor.selector
           subExtractors.forEach(ex => {
             if ('delimiter' in ex) {
               newExtractor.selector = ex.delimiter
             }
           })
-
           newExtractor.extract = subExtractors
         }
 
@@ -453,7 +465,7 @@ async function componentsFieldProcess (o) {
 /**
  * Transforms components extration result to match expected structure.
  *
- * Example extration result (input) :
+ * Example extraction result (input) :
  *  { Lede: "<p>markup contents</p>" }
  * Expected structure (output) :
  *  { c: "Lede", props: { text: "<p>markup contents</p>" }}

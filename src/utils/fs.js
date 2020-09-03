@@ -3,8 +3,6 @@
  * File system related shared utilities.
  */
 
-// import * as fs from 'fs';
-// import * as path from 'path';
 const fs = require('fs')
 const path = require('path')
 const mkdirp = require('mkdirp')
@@ -47,6 +45,6 @@ const walk = (dir, extension) => {
 }
 
 module.exports = {
-  walk: walk,
-  writeFile: writeFile
+  walk,
+  writeFile
 }
