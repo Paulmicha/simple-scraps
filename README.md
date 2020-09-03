@@ -78,12 +78,12 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
           "selector": ".view-chouette-articles article h2 > a",
           "to": "content/blog",
           "cache": true,
-          "maxPagesToCrawl": 3
+          "maxPagesToCrawl": 1
         },
         {
           "selector": ".view-chouette-articles .c-pagination a",
           "to": "start",
-          "maxPagesToCrawl": 2
+          "maxPagesToCrawl": 1
         }
       ]
     }
@@ -103,17 +103,16 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
   "content/blog": [
     {
       "selector": "article.node .field-name-field-tags > a",
-      "extract": "text",
+      "extract": "element",
       "as": "entity.tags",
-      "ref": "taxonomy/tag",
-      "postprocess": "mapTaxonomyTagTitle"
+      "postprocess": "extract.ref.taxonomy.tag"
     }
   ],
   "components": [
     {
       "selector": ".content > .p-percent-h > .c-text-block.u-fs-m",
       "extract": "text",
-      "as": "component/Lede:text"
+      "as": "component.Lede.text"
     },
     {
       "selector": ".c-pimg",
@@ -121,20 +120,21 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
         {
           "selector": ".c-pimg__img",
           "extract": "element",
-          "postprocess": "mapMediaGridItemImage"
+          "as": "component.MediaGrid.items[].image",
+          "postprocess": "extract.media.image"
         },
         {
           "selector": ".c-pimg__text > h2",
           "extract": "text",
-          "as": "component/MediaGrid:item[].title"
+          "as": "component.MediaGrid.items[].title"
         },
         {
           "selector": ".c-pimg__text > .s-rich-text",
           "extract": "markup",
-          "as": "component/MediaGrid:item[].text"
+          "as": "component.MediaGrid.items[].text"
         }
       ],
-      "as": "component/MediaGrid"
+      "as": "component.MediaGrid"
     }
   ]
 }

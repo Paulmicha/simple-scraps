@@ -299,6 +299,9 @@ class Main extends EventEmitter {
       await extract.run({ extractor, extracted: entity, pageWorker, main: this })
     }
 
+    // Allow alterations before saving.
+    this.emit('alter.extraction.result', entity, entityType, bundle, pageWorker)
+
     // Debug.
     // console.log(`Main - resulting entity object (${entityType}.${bundle}) :`)
     // console.log(entity)
