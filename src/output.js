@@ -19,26 +19,21 @@ const { entityToFilePath } = require('./utils/default_storage')
  * @return {boolean} Success flag.
  */
 const saveExtractionResult = async (entity, entityType, bundle, pageWorker, main) => {
-  const storage = {}
   const url = pageWorker.page.url()
 
   // Make storage pluggable.
-  main.emit('store.extraction.result', storage)
-
-  // Fallback to default storage if no provider was found.
-  if (!('store' in storage)) {
-    const filePath = entityToFilePath('data/output', null, url, entityType, bundle)
-
-    if (main.getSetting('outputSkipExisiting') && fs.existsSync(filePath)) {
-      return
-    }
-
-    await writeFile(filePath, JSON.stringify(entity, null, 2))
+  const hadListeners = main.emit('store.extraction.result', entity, entityType, bundle, url, pageWorker)
+  if (hadListeners) {
     return
   }
 
-  // Otherwise, call the provider implementation.
-  return storage.store({ url, entity, pageWorker, main })
+  // Fallback to default storage if no provider was found.
+  const filePath = entityToFilePath('data/output', null, url, entityType, bundle)
+  if (main.getSetting('outputSkipExisiting') && fs.existsSync(filePath)) {
+    return
+  }
+
+  await writeFile(filePath, JSON.stringify(entity, null, 2))
 }
 
 module.exports = {

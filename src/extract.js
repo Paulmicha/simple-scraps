@@ -280,7 +280,7 @@ async function subItemsFieldProcess (o) {
  *
  * For these, the extraction process needs to be provided via event handlers.
  *
- * Emits an event corresponding to the value of extractor.postprocess which gets
+ * Emits an event corresponding to the value of extractor.emit which gets
  * an object representing the extraction details, and which expects it to be
  * altered to add a callback function in its 'callback' prop.
  *
@@ -290,24 +290,27 @@ async function subItemsFieldProcess (o) {
 async function elementFieldProcess (o) {
   const { extractor, extracted, pageWorker, main, field } = o
 
-  if (!extractor.postprocess) {
-    throw Error('Missing extractor postprocess for ' + extractor.as + ', selector : ' + extractor.selector)
+  if (!extractor.emit) {
+    throw Error('Missing extractor "emit" config for processing ' + extractor.as + ', selector : ' + extractor.selector)
   }
 
   // Debug.
-  // console.log(`emitting event '${extractor.postprocess}'`)
+  // console.log(`emitting event '${extractor.emit}'`)
 
-  const postProcessor = {}
-  postProcessor.extractor = { ...extractor }
-  postProcessor.url = pageWorker.page.url()
+  // The event listeners may provide either :
+  //  - a callback function which will be used by puppeteer's page.$$eval() API
+  //  - the field value directly (takes precedence if set)
+  main.emit(extractor.emit, o)
 
-  main.emit(extractor.postprocess, postProcessor)
-
-  if (!postProcessor.callback) {
-    throw Error('Missing callback for element extrator ' + extractor.as + ', selector : ' + extractor.selector)
+  if ('result' in o) {
+    extracted[field] = o.result
+    return
   }
 
-  extracted[field] = await element(pageWorker.page, extractor.selector, postProcessor.callback)
+  if (!o.callback) {
+    throw Error('Missing callback for processing ' + extractor.as + ', selector : ' + extractor.selector)
+  }
+  extracted[field] = await element(pageWorker.page, extractor.selector, o.callback)
 }
 
 /**
@@ -407,7 +410,7 @@ async function componentsFieldProcess (o) {
       //    selector: <use the value from 'variant' prop extractor definition>,
       //    extract: <use the value from 'variant' prop extractor definition>,
       //    as : 'component.MediaGrid.variant',
-      //    ... <any other keys from 'variant' prop extractor definition, e.g. 'postprocess'>
+      //    ... <any other keys from 'variant' prop extractor definition, e.g. 'emit'>
       //  }
       const fields = Object.keys(regroupedExtractors)
 

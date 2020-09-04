@@ -14,6 +14,17 @@ const output = require('./output')
  *  comes to an end.
  * - crawl : opens given URL and queues new operation(s) (crawl or extract).
  * - extract : outputs structured data according to rules declared in config.
+ *
+ * @emits pre-queue.operation.extract ({string} urlFound, {object} op)
+ *  Allows to skip extracting given URL.
+ * @emits alter.extraction.result ({object} entity, {string} entityType, {string} bundle, {Page} pageWorker)
+ *  Allows to modify an extracted object before storage.
+ * @emits store.extraction.result ({object} entity, {string} entityType, {string} bundle, {string} url, {Page} pageWorker)
+ *  Allows to provide alternative storage method for extracted objects.
+ * @emits store.page.markup ({string} content, {string} url, {Page} pageWorker)
+ *  Allows to provide alternative cache storage method for pages HTML markup.
+ * @emits store.page.screenshot ({string} url, {Page} pageWorker)
+ *  Allows to provide alternative cache storage method for pages screenshots.
  */
 class Main extends EventEmitter {
   constructor (config) {
@@ -262,7 +273,11 @@ class Main extends EventEmitter {
       } else {
         // Normal extraction.
         op.type = 'extract'
-        this.operations.addItem(urlFound, op)
+        // Allow to skip this operation via event.
+        this.emit('pre-queue.operation.extract', urlFound, op)
+        if (!op.skip) {
+          this.operations.addItem(urlFound, op)
+        }
       }
     }
   }
