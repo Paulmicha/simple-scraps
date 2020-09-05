@@ -5,6 +5,7 @@ const Queue = require('./Queue')
 const extract = require('./extract')
 const cache = require('./cache')
 const output = require('./output')
+const defaultConfig = require('./utils/default_config.js')
 
 /**
  * Main "simple scraps" class.
@@ -48,33 +49,7 @@ class Main extends EventEmitter {
       this.config.settings = {}
     }
     if (!(setting in this.config.settings)) {
-      switch (setting) {
-        // TODO device emulation (i.e. mobile) ?
-        case 'pageW':
-          return 1280
-        case 'pageH':
-          return 800
-        case 'addDomQueryHelper':
-          return true
-        case 'maxParallelPages':
-          return 4
-        case 'crawlDelay':
-          return [500, 2500]
-        // TODO instead, leave more options inside each "follow" config. E.g.
-        // screenshot format, quality, device emulation / resolution, etc.
-        // -> Deprecated.
-        case 'cacheWithScreenshot':
-          return true
-        case 'cacheSkipExisiting':
-          return true
-        case 'beautifyHtml':
-          return true
-        // TODO instead of boolean setting, use enum or something pluggable to
-        // support different strategies to deal with previously extracted
-        // objects (during reruns).
-        case 'outputSkipExisiting':
-          return true
-      }
+      return defaultConfig.setting(setting)
     }
     return this.config.settings[setting]
   }

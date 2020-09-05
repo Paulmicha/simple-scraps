@@ -213,7 +213,7 @@ async function subItemsFieldProcess (o) {
     const multiFieldItemProp = as(componentExtractor, true)
 
     // Delimiters use "markers" that are directly set on the DOM element defined
-    // as scope for every single child item. They are data-attribute containing
+    // as scope for every single child item. They are data-attributes containing
     // a counter.
     const destination = as(componentExtractor)
 
