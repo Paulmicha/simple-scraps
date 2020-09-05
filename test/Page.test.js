@@ -19,11 +19,14 @@ test.before(async t => {
   ScraperMock.browser = await puppeteer.launch()
 })
 
+// This runs after all tests.
+test.after('cleanup', async t => {
+  await ScraperMock.browser.close()
+})
+
 test('1. Opening a URL', async t => {
   const pageWorker = new Page(ScraperMock)
   await pageWorker.init()
-  // await pageWorker.page.goto(`file:${urls.blog}`)
-  // t.is(`file://${urls.blog}`, pageWorker.page.url())
   await pageWorker.page.goto(urls.blog)
   t.is(urls.blog, pageWorker.page.url())
 })
