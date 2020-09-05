@@ -28,6 +28,11 @@
       "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
     }
   },
+  "ava": {
+    "files": [
+      "test/**/*.test.js"
+    ]
+  },
   "author": "Paulmicha",
   "license": "MIT"
 }

@@ -136,7 +136,7 @@ class Main extends EventEmitter {
   }
 
   /**
-   * Creates initial operations (adds new pages to crawl).
+   * Creates initial operations (adds new pages to crawl or directly extract).
    */
   async createInitialOps (entryPoint) {
     if (!entryPoint.follow) {
