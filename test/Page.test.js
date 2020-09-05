@@ -1,6 +1,6 @@
 const test = require('ava')
 const puppeteer = require('puppeteer')
-const path = require('path')
+const { urls } = require('./shared.js')
 const Page = require('../src/Page')
 const defaultConfig = require('../src/utils/default_config.js')
 
@@ -8,11 +8,6 @@ const defaultConfig = require('../src/utils/default_config.js')
 // being tested here.
 const ScraperMock = {}
 ScraperMock.getSetting = (setting) => defaultConfig.setting(setting)
-
-// Local static pages URLs.
-const urls = {
-  blog: 'file://' + path.resolve(__dirname, 'static', 'Blog.html')
-}
 
 // This runs before all tests.
 test.before(async t => {

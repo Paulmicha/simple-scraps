@@ -28,8 +28,17 @@ const defaultConfig = require('./utils/default_config.js')
  *  Allows to provide alternative cache storage method for pages screenshots.
  */
 class Main extends EventEmitter {
+  /**
+   * @param {object|array} config if an array is passed, assume items are entry
+   *  points.
+   */
   constructor (config) {
     super()
+    if (Array.isArray(config)) {
+      config = {
+        start: config
+      }
+    }
     this.config = config
     this.pages = []
     this.openPages = {}
@@ -61,9 +70,9 @@ class Main extends EventEmitter {
     this.browser = await puppeteer.launch()
     const promises = []
     for (let i = 0; i < this.getSetting('maxParallelPages'); i++) {
-      const page = new Page(this)
-      this.pages.push(page)
-      promises.push(page.init())
+      const pageWorker = new Page(this)
+      this.pages.push(pageWorker)
+      promises.push(pageWorker.init())
     }
     await Promise.all(promises)
   }
@@ -87,8 +96,15 @@ class Main extends EventEmitter {
       if (!entryPoint.url) {
         throw Error('Missing start url')
       }
+      // This can be used as a spider (opens an initial page where there are
+      // links to follow) or to extract directly data from a single URL.
       if (!entryPoint.follow) {
-        throw Error('Missing start links to follow')
+        if (!entryPoint.is && !entryPoint.extract) {
+          throw Error('Missing start links to follow')
+        }
+        if (!entryPoint.is || !entryPoint.extract) {
+          throw Error('Missing initial extraction details (is + extract)')
+        }
       }
       this.createInitialOps(entryPoint)
     }
@@ -106,7 +122,16 @@ class Main extends EventEmitter {
     }
   }
 
+  /**
+   * When the crawling is over, this method closes everything that was open (the
+   * pages and the browser itself).
+   */
   async stop () {
+    const promises = []
+    this.pages.forEach(pageWorker => {
+      promises.push(pageWorker.page.close())
+    })
+    await Promise.all(promises)
     await this.browser.close()
   }
 
@@ -114,6 +139,21 @@ class Main extends EventEmitter {
    * Creates initial operations (adds new pages to crawl).
    */
   async createInitialOps (entryPoint) {
+    if (!entryPoint.follow) {
+      const op = {
+        type: 'extract',
+        to: entryPoint.is,
+        extract: entryPoint.extract,
+        cache: entryPoint.cache,
+        conf: { ...entryPoint }
+      }
+      this.emit('pre-queue.operation.extract', entryPoint.url, op)
+      if (!op.skip) {
+        this.operations.addItem(entryPoint.url, op)
+      }
+      return
+    }
+
     for (let j = 0; j < entryPoint.follow.length; j++) {
       const op = entryPoint.follow[j]
 
@@ -269,6 +309,9 @@ class Main extends EventEmitter {
 
   /**
    * Extraction process starting point.
+   *
+   * Deals with cases where the conf contains 1 or more entry points with no
+   * mapping to extractors, but provide their own extractors directly.
    */
   async extract (pageWorker, op) {
     if (!('to' in op)) {
@@ -280,8 +323,21 @@ class Main extends EventEmitter {
     const [entityType, bundle] = op.to.split('/')
     const entity = {}
 
-    // Get all defined extractors that match current destination.
-    const extractors = extract.match(entityType, this)
+    // Get all defined extractors that match current destination, unless
+    // directly specified in the op (for cases where a single URL is "hardcoded"
+    // in conf).
+    let extractors = []
+    if ('extract' in op) {
+      extractors = op.extract
+    } else {
+      extractors = extract.match(entityType, this)
+    }
+
+    // Debug.
+    // console.log('op')
+    // console.log(op)
+    // console.log('extractors')
+    // console.log(extractors)
 
     // Chain all extractors that need to run on given page to build our entity.
     for (let i = 0; i < extractors.length; i++) {
