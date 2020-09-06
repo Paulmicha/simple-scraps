@@ -15,6 +15,7 @@ async function linksUrl (page, selector) {
   }
 
   await page.waitForSelector(selector)
+  /* istanbul ignore next */
   const urlsFound = await page.evaluate((selector) => {
     // This function is running inside headless Chrome.
     const extracts = []
@@ -40,6 +41,7 @@ async function linksUrl (page, selector) {
  * a string.
  */
 async function text (page, selector) {
+  /* istanbul ignore next */
   return arrayOrItemIfSingle(
     await page.$$eval(selector, items => items.map(
       item => item.textContent.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
@@ -54,6 +56,7 @@ async function text (page, selector) {
  * a string.
  */
 async function markup (page, selector) {
+  /* istanbul ignore next */
   return arrayOrItemIfSingle(
     await page.$$eval(selector, items => items.map(
       item => item.innerHTML.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
@@ -71,6 +74,7 @@ async function markup (page, selector) {
  * a string.
  */
 async function element (page, selector, callback) {
+  /* istanbul ignore next */
   return arrayOrItemIfSingle(await page.$$eval(selector, callback))
 }
 

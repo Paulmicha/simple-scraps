@@ -48,6 +48,7 @@ class Page {
   async addDomQueryHelper () {
     // If jQuery is already loaded, make sure it's available in global scope as
     // the $() function. Otherwise, include the 'cash-dom' lib.
+    /* istanbul ignore next */
     const jQueryExists = await this.page.evaluate(() => {
       // This function is running inside headless Chrome.
       if (typeof jQuery === 'function') {
