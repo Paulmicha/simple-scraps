@@ -80,14 +80,50 @@ class Main extends EventEmitter {
   /**
    * Populates the queue with initial operations and starts the main loop.
    *
-   * Each entry point defines an URL from which some links may be followed.
    * Operations are processed in batch of up to 'maxParallelPages' pages (1 page
    * per URL).
+   *
+   * Each entry point defines an URL where either links are followed (starts a
+   * spider crawling process), or some output is extracted directly.
+   *
+   * @example
+   *  // This entry point only extracts a single string :
+   *  {
+   *    url: 'https://domain.com/my-page-to-extract',
+   *    extract: [
+   *      {
+   *        selector: 'head title',
+   *        extract: 'text',
+   *        as: 'entity.title'
+   *      }
+   *    ]
+   *  }
+   *
+   * @example
+   *  // This entry point starts a link crawling process, where pager links will
+   *  // trigger a recursive crawling process, and all links found in articles
+   *  // title headings will trigger the extraction of 'blog' content entities :
+   *  {
+   *    "url": "https://www.chouette.net.br/blog",
+   *    "follow": [
+   *      {
+   *        "selector": ".view-chouette-articles article h2 > a",
+   *        "to": "content/blog",
+   *        "cache": true,
+   *        "maxPagesToCrawl": 15
+   *      },
+   *      {
+   *        "selector": ".view-chouette-articles .c-pagination a",
+   *        "to": "start",
+   *        "maxPagesToCrawl": 3
+   *      }
+   *    ]
+   *  }
    */
   async start () {
     const entryPoints = this.config.start
     if (!entryPoints) {
-      throw Error('Missing start config')
+      throw Error('Missing start config (no entry points were found)')
     }
 
     // Begins with populating the initial URL(s) operation(s).
@@ -99,11 +135,13 @@ class Main extends EventEmitter {
       // This can be used as a spider (opens an initial page where there are
       // links to follow) or to extract directly data from a single URL.
       if (!entryPoint.follow) {
-        if (!entryPoint.is && !entryPoint.extract) {
+        if (!entryPoint.extract) {
           throw Error('Missing start links to follow')
         }
-        if (!entryPoint.is || !entryPoint.extract) {
-          throw Error('Missing initial extraction details (is + extract)')
+        // Assume the URL being extracted is a 'page' (content) entity when not
+        // explicitly defined in entry point.
+        if (!entryPoint.is) {
+          entryPoint.is = 'content/page'
         }
       }
       this.createInitialOps(entryPoint)
