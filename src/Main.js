@@ -136,6 +136,16 @@ class Main extends EventEmitter {
   }
 
   /**
+   * Wraps the 3 steps that constitues the entire lifecycle of a scraping
+   * session.
+   */
+  async run () {
+    await this.init()
+    await this.start()
+    await this.stop()
+  }
+
+  /**
    * Creates initial operations (adds new pages to crawl or directly extract).
    */
   async createInitialOps (entryPoint) {
