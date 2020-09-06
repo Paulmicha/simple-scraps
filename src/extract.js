@@ -4,6 +4,7 @@
  */
 
 const urlParse = require('url-parse')
+const beautifyHtml = require('js-beautify').html
 
 /**
  * Extracts absolute URLs from links matched by given selector.
@@ -55,7 +56,19 @@ async function text (page, selector) {
  * If multiple elements match the selector, an Array will be returned, otherwise
  * a string.
  */
-async function markup (page, selector) {
+async function markup (page, selector, minify) {
+  if (minify) {
+    /* istanbul ignore next */
+    const matches = await page.$$eval(selector, items => items.map(
+      item => item.innerHTML.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
+    ))
+    return arrayOrItemIfSingle(
+      matches.map(
+        html => beautifyHtml(html, { indent_size: 0 })
+          .replace(/(\r\n|\n|\r)/gm, '')
+      )
+    )
+  }
   /* istanbul ignore next */
   return arrayOrItemIfSingle(
     await page.$$eval(selector, items => items.map(
@@ -163,7 +176,7 @@ async function run (o) {
       extracted[field] = await text(pageWorker.page, extractor.selector)
       break
     case 'markup':
-      extracted[field] = await markup(pageWorker.page, extractor.selector)
+      extracted[field] = await markup(pageWorker.page, extractor.selector, main.getSetting('minifyExtractedHtml'))
       break
     case 'element':
       await elementFieldProcess({ extractor, extracted, pageWorker, main, field })

@@ -33,6 +33,8 @@ const setting = (key) => {
     // objects (during reruns).
     case 'outputSkipExisiting':
       return true
+    case 'minifyExtractedHtml':
+      return true
   }
 }
 
