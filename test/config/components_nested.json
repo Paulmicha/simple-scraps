@@ -20,6 +20,43 @@
       "selector": "header.jumbotron > .container *:not(h1)",
       "extract": "text_single",
       "as": "component.Lede.text"
+    },
+    {
+      "selector": "header + section > .bs-component",
+      "extract": [
+        {
+          "selector": "> .nav-tabs > li > [data-toggle=tab]",
+          "extract": "text",
+          "as": "component.NavTabs.items[].title"
+        },
+        {
+          "selector": "> .tab-content > .tab-pane",
+          "extract": "components",
+          "as": "component.MediaGrid.items[].content"
+        }
+      ],
+      "as": "component.NavTabs"
+    },
+    {
+      "selector": ".card",
+      "extract": [
+        {
+          "selector": "> .card-header",
+          "extract": "text_single",
+          "as": "component.Card.header"
+        },
+        {
+          "selector": "> .card-body > .card-title",
+          "extract": "text_single",
+          "as": "component.Card.title"
+        },
+        {
+          "selector": "> .card-body > .card-text",
+          "extract": "text_single",
+          "as": "component.Card.text"
+        }
+      ],
+      "as": "component.Card"
     }
   ]
 }

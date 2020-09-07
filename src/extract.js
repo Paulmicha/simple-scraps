@@ -36,7 +36,7 @@ async function linksUrl (page, selector) {
 }
 
 /**
- * Extracts plain text string(s) from given selector.
+ * Extracts plain text string(s) matching given selector.
  *
  * If multiple elements match the selector, an Array will be returned, otherwise
  * a string.
@@ -62,7 +62,7 @@ async function text (page, selector, removeBreaks) {
 }
 
 /**
- * Extracts a single plain text string from given selector.
+ * Extracts a single plain text string matching given selector.
  *
  * Unlike the plain text extractor, this always returns a string, no matter how
  * many matches are found. If multiple elements match, the extracted string will
@@ -77,7 +77,7 @@ async function textSingle (page, selector, separator, removeBreaks) {
 }
 
 /**
- * Extracts inner HTML from given selector.
+ * Extracts inner HTML matching given selector.
  *
  * If multiple elements match the selector, an Array will be returned, otherwise
  * a string.
@@ -392,10 +392,34 @@ async function elementFieldProcess (o) {
  * this case, the "extract" key would contain an array (of extractors), and the
  * destination would be e.g. :
  *  "as": "component.MediaGrid"
+ *
+ * TODO evaluate possibility to provide an array of selectors to deal with cases
+ * where we need to build a single component out of multiple elements that do
+ * not share a "not too distant" common ancestor.
+ *
+ * Another approach could be to allow preprocessor script that would prepare
+ * elements (e.g. add custom classes) to facilitate the extraction process.
+ *
+ * Or, we could use jQuery-like syntax directly and preprocess that - e.g. :
+ * 1. Set a custom class on parent element and use it as new scope :
+ *  "selector": ".nav-tabs.parent()"
+ * 2. Idem, but using closest() to set scope in any ancestor (stops at closest
+ *  match) :
+ *  "selector": ".nav-tabs.closest(section)"
+ * 3. Going up then down the DOM tree :
+ *  "selector": ".nav-tabs.closest(section).find(.something)"
+ *
+ * This would require using DOM query helper, and a custom selector preprocessor
+ * function. TODO next iteration.
+ * @see Page.addDomQueryHelper()
  */
 async function componentsFieldProcess (o) {
   const { extractor, extracted, pageWorker, main, field } = o
 
+  // TODO evaluate wildcards for doing things like :
+  //  "extract": "components.nested"
+  // which could contain e.g. only selector overrides based on the "base"
+  // extractors (components).
   if (!('components' in main.config)) {
     throw Error('Missing components definition for selector : ' + extractor.selector)
   }
@@ -404,8 +428,6 @@ async function componentsFieldProcess (o) {
 
   for (let i = 0; i < main.config.components.length; i++) {
     const componentExtractor = main.config.components[i]
-    componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
-
     const component = {}
     const [thing, type, prop] = as(componentExtractor)
 
@@ -415,6 +437,7 @@ async function componentsFieldProcess (o) {
     // Otherwise, the "extract" key contains an array of sub-extractors which
     // must all run on the same component object.
     if (!Array.isArray(componentExtractor.extract)) {
+      componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
       await run({
         extractor: componentExtractor,
         extracted: component,
@@ -483,20 +506,24 @@ async function componentsFieldProcess (o) {
       const fields = Object.keys(regroupedExtractors)
 
       // Debug.
-      // console.log('fields :')
-      // console.log(fields)
-      // console.log('extractors :')
-      // console.log(regroupedExtractors[field].map(e => e.as))
+      console.log('fields :')
+      console.log(fields)
 
       for (let i = 0; i < fields.length; i++) {
         const field = fields[i]
+
+        // Debug.
+        console.log('subExtractors :')
+        console.log(regroupedExtractors[field].map(e => e.as))
+
         const subExtractors = regroupedExtractors[field]
         let newExtractor = { as: `${thing}.${type}.${field}` }
 
         // Simple props have a single extractor which can be used "as is".
         // Multi-field sub-items need 1 'extract' array item per field.
         if (subExtractors.length === 1) {
-          newExtractor = subExtractors.pop()
+          newExtractor = { ...subExtractors.pop() }
+          newExtractor.selector = `${componentExtractor.selector} ${newExtractor.selector}`
         } else {
           // Selector fallback : use the component's extractor value. Then look
           // for a 'delimiter' key in child extractors if available.
@@ -505,13 +532,14 @@ async function componentsFieldProcess (o) {
             if ('delimiter' in ex) {
               newExtractor.selector = ex.delimiter
             }
+            ex.selector = `${componentExtractor.selector} ${ex.selector}`
           })
           newExtractor.extract = subExtractors
         }
 
         // Debug.
-        // console.log('newExtractor :')
-        // console.log(newExtractor)
+        console.log('newExtractor :')
+        console.log(newExtractor)
 
         await run({
           extractor: newExtractor,

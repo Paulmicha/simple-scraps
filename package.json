@@ -8,6 +8,7 @@
     "cash-dom": "^8.0.0",
     "debug": "^4.1.1",
     "js-beautify": "^1.13.0",
+    "html-minifier-terser": "^5.1.1",
     "mkdirp": "^1.0.4",
     "puppeteer": "^5.2.1",
     "url-parse": "^1.4.7"
@@ -16,7 +17,6 @@
     "@commitlint/cli": "^10.0.0",
     "@commitlint/config-conventional": "^10.0.0",
     "ava": "^3.12.1",
-    "html-minifier-terser": "^5.1.1",
     "husky": "^4.2.5",
     "nyc": "^15.1.0",
     "standard": "*"

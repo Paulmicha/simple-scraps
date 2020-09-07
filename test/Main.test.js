@@ -82,6 +82,10 @@ test.serial('2. Extract a simple component', async t => {
       {
         selector: '.bs-docs-section:nth-child(3) .col-lg-7 .btn-primary.btn-lg',
         extract: 'text',
+        // The extract 'as' syntax can support any of the following declarations :
+        // - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
+        // - <thing>.<type>.<prop> (ex: component.Lede.text)
+        // - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
         as: 'component.Button.text'
       }
     ]
