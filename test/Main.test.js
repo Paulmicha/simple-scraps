@@ -3,6 +3,10 @@ const { urls } = require('./shared.js')
 const SimpleScraps = require('../src/Main')
 const nestedComponentsConfig = require('./config/components_nested.json')
 
+// The JSON test config file contains an entry point with an URL that needs to
+// be replaced for resolving absolute paths (since we use local static files).
+nestedComponentsConfig.start[0].url = urls.article
+
 // NB. For performance reasons, we run all tests serially in order to avoid
 // having too many headless browsers open at the same time (each having multiple
 // pages open to process operations concurrently already).
@@ -23,6 +27,11 @@ test.serial('1. Extract a single string (plain text + HTML markup)', async t => 
           as: 'entity.title'
         },
         {
+          selector: '.blog-sidebar > .p-4:last-child a',
+          extract: 'text_single',
+          as: 'entity.test_plain_text_multi_matches'
+        },
+        {
           selector: '.blog-footer',
           extract: 'markup',
           as: 'entity.test_markup'
@@ -39,6 +48,7 @@ test.serial('1. Extract a single string (plain text + HTML markup)', async t => 
   scraps.on('store.extraction.result', (entity) => {
     t.is('Blog Template · Bootstrap', entity.title)
     t.is('<p>Blog template built for <a href="https://getbootstrap.com/">Bootstrap</a> by <a href="https://twitter.com/mdo">@mdo</a>.</p><p><a href="#">Back to top</a></p>', entity.test_markup)
+    t.is('GitHub Twitter Facebook', entity.test_plain_text_multi_matches)
   })
 
   await scraps.run()
@@ -89,12 +99,16 @@ test.serial('3. Extract nested components', async t => {
   const scraps = new SimpleScraps(nestedComponentsConfig)
 
   scraps.on('store.extraction.result', (entity, entityType, bundle, url, pageWorker) => {
-    // Debug.
-    console.log([entity, entityType, bundle, url])
-  })
+    // While we're at it, test that the entity type and bundle mapping is
+    // correct.
+    t.is('content', entityType)
+    t.is('article', bundle)
 
-  // Debug (wip).
-  t.pass()
+    // Debug.
+    console.log('TODO (wip) Extract nested components :')
+    // console.log([entity, entityType, bundle, url])
+    console.log(entity.content)
+  })
 
   await scraps.run()
 })

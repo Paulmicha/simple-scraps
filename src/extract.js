@@ -36,18 +36,44 @@ async function linksUrl (page, selector) {
 }
 
 /**
- * Extracts plain text from given selector.
+ * Extracts plain text string(s) from given selector.
  *
  * If multiple elements match the selector, an Array will be returned, otherwise
  * a string.
  */
-async function text (page, selector) {
+async function text (page, selector, removeBreaks) {
   /* istanbul ignore next */
-  return arrayOrItemIfSingle(
-    await page.$$eval(selector, items => items.map(
-      item => item.textContent.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
-    ))
-  )
+  const matches = await page.$$eval(selector, items => items.map(
+    item => item.textContent
+      // The first replace regex is used to remove indentation when HTML
+      // markup contains line breaks.
+      .replace(/^\s{2,}/gm, '')
+      // The second replace regex is used to trim the matched text.
+      .replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
+  ))
+
+  if (removeBreaks) {
+    return arrayOrItemIfSingle(
+      matches.map(string => string.replace(/[\r\n]+/gm, ' '))
+    )
+  }
+
+  return arrayOrItemIfSingle(matches)
+}
+
+/**
+ * Extracts a single plain text string from given selector.
+ *
+ * Unlike the plain text extractor, this always returns a string, no matter how
+ * many matches are found. If multiple elements match, the extracted string will
+ * join them using given separator (defaults to a space in scraper settings).
+ */
+async function textSingle (page, selector, separator, removeBreaks) {
+  const matches = await text(page, selector, removeBreaks)
+  if (Array.isArray(matches)) {
+    return matches.join(separator)
+  }
+  return matches
 }
 
 /**
@@ -60,6 +86,7 @@ async function markup (page, selector, minify) {
   if (minify) {
     /* istanbul ignore next */
     const matches = await page.$$eval(selector, items => items.map(
+      // The replace regex is used to trim the matched markup.
       item => item.innerHTML.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
     ))
     return arrayOrItemIfSingle(
@@ -72,6 +99,7 @@ async function markup (page, selector, minify) {
   /* istanbul ignore next */
   return arrayOrItemIfSingle(
     await page.$$eval(selector, items => items.map(
+      // The replace regex is used to trim the matched markup.
       item => item.innerHTML.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
     ))
   )
@@ -173,10 +201,26 @@ async function run (o) {
   // "Normal" process : extractor.extract is a string.
   switch (extractor.extract) {
     case 'text':
-      extracted[field] = await text(pageWorker.page, extractor.selector)
+      extracted[field] = await text(
+        pageWorker.page,
+        extractor.selector,
+        main.getSetting('plainTextRemoveBreaks')
+      )
+      break
+    case 'text_single':
+      extracted[field] = await textSingle(
+        pageWorker.page,
+        extractor.selector,
+        main.getSetting('plainTextSeparator'),
+        main.getSetting('plainTextRemoveBreaks')
+      )
       break
     case 'markup':
-      extracted[field] = await markup(pageWorker.page, extractor.selector, main.getSetting('minifyExtractedHtml'))
+      extracted[field] = await markup(
+        pageWorker.page,
+        extractor.selector,
+        main.getSetting('minifyExtractedHtml')
+      )
       break
     case 'element':
       await elementFieldProcess({ extractor, extracted, pageWorker, main, field })

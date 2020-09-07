@@ -33,6 +33,10 @@ const setting = (key) => {
     // objects (during reruns).
     case 'outputSkipExisiting':
       return true
+    case 'plainTextRemoveBreaks':
+      return true
+    case 'plainTextSeparator':
+      return ' '
     case 'minifyExtractedHtml':
       return true
   }
