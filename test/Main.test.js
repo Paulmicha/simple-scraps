@@ -108,10 +108,17 @@ test.serial('3. Extract nested components', async t => {
     t.is('content', entityType)
     t.is('article', bundle)
 
+    // At the root level, there should be exactly 1 Lede, and 1 NavTabs.
+    // TODO [wip] see run() TODO in src/extract.js
+    // t.is(2, entity.content.length)
+
     // Debug.
     console.log('TODO (wip) Extract nested components :')
     // console.log([entity, entityType, bundle, url])
-    console.log(entity.content)
+    // console.log(entity.content)
+    // console.log(entity.content[1].props)
+    // console.log(entity.content[1].props.items[0].content)
+    console.log(JSON.stringify(entity, null, 2))
   })
 
   await scraps.run()

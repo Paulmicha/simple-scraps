@@ -183,6 +183,18 @@ function as (extractor, onlyTail) {
 async function run (o) {
   const { extractor, extracted, pageWorker, main, fieldOverride } = o
 
+  // Preprocess selectors to handle scope in recusrive calls and customizations.
+  // TODO [wip] need to mark scoped elements as "already extracted" to avoid
+  // selectors potentially matching multiple times the same element during
+  // nested components extraction.
+  // Example :
+  //  - a Card component is matched from "root" scope once
+  //  - a NavTabs component has a tab pane content that also extracts components
+  //  - if one of its panes contains a Card component, it may be matched again
+  // -> We need a way to start from deepest levels and mark components as
+  // already extracted so they can be skipped from "higher" levels (up to root).
+  selectorPreProcess(o)
+
   // Debug.
   // console.log(Object.keys(o))
   // console.log(extractor)
@@ -268,7 +280,7 @@ async function subItemsFieldProcess (o) {
   const { extractor, extracted, pageWorker, main, field } = o
 
   // Debug.
-  console.log(`subItemsFieldProcess(${field})`)
+  // console.log(`subItemsFieldProcess(${field})`)
   // console.log(extractor.extract)
 
   const subItem = {}
@@ -276,7 +288,7 @@ async function subItemsFieldProcess (o) {
 
   while (extractor.extract.length) {
     const componentExtractor = extractor.extract.shift()
-    componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
+    // componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
 
     const multiFieldItemProp = as(componentExtractor, true)
 
@@ -298,6 +310,7 @@ async function subItemsFieldProcess (o) {
 
     await run({
       extractor: componentExtractor,
+      parentExtractor: extractor,
       extracted: subItem,
       pageWorker,
       main,
@@ -306,7 +319,7 @@ async function subItemsFieldProcess (o) {
   }
 
   // Debug.
-  console.log(`  TODO (wip) implement delimiters for ${subItemDelimiters.join(', ')}`)
+  // console.log(`  TODO (wip) implement delimiters for ${subItemDelimiters.join(', ')}`)
 
   // Debug.
   // console.log('  subItem :')
@@ -392,26 +405,6 @@ async function elementFieldProcess (o) {
  * this case, the "extract" key would contain an array (of extractors), and the
  * destination would be e.g. :
  *  "as": "component.MediaGrid"
- *
- * TODO evaluate possibility to provide an array of selectors to deal with cases
- * where we need to build a single component out of multiple elements that do
- * not share a "not too distant" common ancestor.
- *
- * Another approach could be to allow preprocessor script that would prepare
- * elements (e.g. add custom classes) to facilitate the extraction process.
- *
- * Or, we could use jQuery-like syntax directly and preprocess that - e.g. :
- * 1. Set a custom class on parent element and use it as new scope :
- *  "selector": ".nav-tabs.parent()"
- * 2. Idem, but using closest() to set scope in any ancestor (stops at closest
- *  match) :
- *  "selector": ".nav-tabs.closest(section)"
- * 3. Going up then down the DOM tree :
- *  "selector": ".nav-tabs.closest(section).find(.something)"
- *
- * This would require using DOM query helper, and a custom selector preprocessor
- * function. TODO next iteration.
- * @see Page.addDomQueryHelper()
  */
 async function componentsFieldProcess (o) {
   const { extractor, extracted, pageWorker, main, field } = o
@@ -437,9 +430,9 @@ async function componentsFieldProcess (o) {
     // Otherwise, the "extract" key contains an array of sub-extractors which
     // must all run on the same component object.
     if (!Array.isArray(componentExtractor.extract)) {
-      componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
       await run({
         extractor: componentExtractor,
+        parentExtractor: extractor,
         extracted: component,
         pageWorker,
         main,
@@ -506,15 +499,15 @@ async function componentsFieldProcess (o) {
       const fields = Object.keys(regroupedExtractors)
 
       // Debug.
-      console.log('fields :')
-      console.log(fields)
+      // console.log('fields :')
+      // console.log(fields)
 
       for (let i = 0; i < fields.length; i++) {
         const field = fields[i]
 
         // Debug.
-        console.log('subExtractors :')
-        console.log(regroupedExtractors[field].map(e => e.as))
+        // console.log('subExtractors :')
+        // console.log(regroupedExtractors[field].map(e => e.as))
 
         const subExtractors = regroupedExtractors[field]
         let newExtractor = { as: `${thing}.${type}.${field}` }
@@ -522,8 +515,7 @@ async function componentsFieldProcess (o) {
         // Simple props have a single extractor which can be used "as is".
         // Multi-field sub-items need 1 'extract' array item per field.
         if (subExtractors.length === 1) {
-          newExtractor = { ...subExtractors.pop() }
-          newExtractor.selector = `${componentExtractor.selector} ${newExtractor.selector}`
+          newExtractor = subExtractors.pop()
         } else {
           // Selector fallback : use the component's extractor value. Then look
           // for a 'delimiter' key in child extractors if available.
@@ -532,17 +524,17 @@ async function componentsFieldProcess (o) {
             if ('delimiter' in ex) {
               newExtractor.selector = ex.delimiter
             }
-            ex.selector = `${componentExtractor.selector} ${ex.selector}`
           })
           newExtractor.extract = subExtractors
         }
 
         // Debug.
-        console.log('newExtractor :')
-        console.log(newExtractor)
+        // console.log('newExtractor :')
+        // console.log(newExtractor)
 
         await run({
           extractor: newExtractor,
+          parentExtractor: extractor,
           extracted: component,
           pageWorker,
           main,
@@ -583,6 +575,55 @@ function componentEntityToObject (componentEntity, type, prop) {
   }
 
   return transformedObject
+}
+
+/**
+ * Preprocesses all selectors before extraction nbegins.
+ *
+ * This facilitates scope handling, allows customizations and jQuery-like
+ * selector syntax if there is a DOM Query Helper available in browsed page(s).
+ * @see Page.addDomQueryHelper()
+ *
+ * If the extractor has a 'preprocess' key, its value serves as the event
+ * emitted to allow custom implementations that would prepare elements (e.g. add
+ * custom classes) to facilitate the extraction process.
+ *
+ * Examples of jQuery-like syntax :
+ *   1. Set a custom class on parent element and use it as new scope :
+ *     "selector": ".nav-tabs.parent()"
+ *   2. Idem, but using closest() to set scope in any ancestor (stops at closest
+ *    match) :
+ *     "selector": ".nav-tabs.closest(section)"
+ *   3. Going up then down the DOM tree :
+ *     "selector": ".nav-tabs.closest(section).find(.something)"
+ *
+ * TODO evaluate alternative to provide an array of selectors to deal with cases
+ * where we need to build a single component out of multiple elements that do
+ * not share a "not too distant" common ancestor.
+ */
+// const selectorPreProcess = (extractor, main, parentExtractor) => {
+const selectorPreProcess = (o) => {
+  const { extractor, main, parentExtractor } = o
+
+  // First, detect and call any custom 'preprocess' implementations.
+  if ('preprocess' in extractor) {
+    main.emit(extractor.preprocess, o)
+  }
+
+  // TODO [wip] next iteration :
+  // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
+  // classes).
+  // if (main.getSetting('addDomQueryHelper')) {
+  // }
+
+  // Scope the selector if we have a parent, otherwise set as empty string
+  // to mean global scope (window).
+  if (parentExtractor) {
+    extractor.scope = parentExtractor.selector
+    extractor.selector = `${parentExtractor.selector} ${extractor.selector}`
+  } else {
+    extractor.scope = ''
+  }
 }
 
 module.exports = {

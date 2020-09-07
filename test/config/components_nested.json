@@ -25,7 +25,7 @@
       "selector": "header + section > .bs-component",
       "extract": [
         {
-          "selector": "> .nav-tabs > li > [data-toggle=tab]",
+          "selector": "> .nav-tabs > li > .nav-link",
           "extract": "text",
           "as": "component.NavTabs.items[].title"
         },
