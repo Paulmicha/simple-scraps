@@ -6,37 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <meta name="description" content="">
   <meta name="author" content="Mark Otto, Jacob Thornton, and Bootstrap contributors">
-  <title>Jumbotron Template · Bootstrap</title>
-
-  <!-- Bootstrap core CSS -->
+  <title>Jumbotron Template (adapted for Simple Scraps tests) · Bootstrap</title>
   <link href="assets/bootstrap.css" rel="stylesheet">
-
-  <style>
-    .bd-placeholder-img {
-      font-size: 1.125rem;
-      text-anchor: middle;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-
-    @media (min-width: 768px) {
-      .bd-placeholder-img-lg {
-        font-size: 3.5rem;
-      }
-    }
-  </style>
 </head>
-
 <body>
+
   <nav class="navbar navbar-expand-md navbar-dark fixed-top bg-dark">
     <a class="navbar-brand" href="#">Navbar</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault"
       aria-controls="navbarsExampleDefault" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
-
     <div class="collapse navbar-collapse" id="navbarsExampleDefault">
       <ul class="navbar-nav mr-auto">
         <li class="nav-item active">
@@ -68,22 +48,152 @@
   <main role="main">
 
     <!-- Main jumbotron for a primary marketing message or call to action -->
-    <div class="jumbotron">
+    <header class="jumbotron">
       <div class="container">
         <h1 class="display-3">Hello, world!</h1>
         <p>This is a template for a simple marketing or informational
           website. It includes a large callout called a jumbotron and three
           supporting pieces of content. Use it as a starting point to create
           something more unique.</p>
-        <p><a class="btn btn-primary btn-lg" href="#" role="button">Learn more »</a></p>
+        <p>The content of this article contains nested components for tests.</p>
       </div>
-    </div>
+    </header>
 
-    <div class="container">
-      <!-- Example row of columns -->
+    <section class="container">
+      <h2 class="display-5">Nested components inside tabs</h2>
+      <div class="bs-component">
+        <ul class="nav nav-tabs mb-3">
+          <li class="nav-item">
+            <a class="nav-link active" data-toggle="tab" href="#home">Home</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-toggle="tab" href="#profile">Profile</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link disabled" href="#">Disabled</a>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">Dropdown</a>
+            <div class="dropdown-menu">
+              <a class="dropdown-item" href="#">Action</a>
+              <a class="dropdown-item" href="#">Another action</a>
+              <a class="dropdown-item" href="#">Something else here</a>
+              <div class="dropdown-divider"></div>
+              <a class="dropdown-item" href="#">Separated link</a>
+            </div>
+          </li>
+        </ul>
+        <div id="myTabContent" class="tab-content">
+          <div class="tab-pane fade show active" id="home">
+            <div class="row">
+              <div class="col-lg-12">
+                <p>This tab pane contains a card and a blockquote below :</p>
+              </div>
+              <div class="col-lg-6">
+                <div class="card bg-light mb-3" style="max-width: 20rem;">
+                  <div class="card-header">Header</div>
+                  <div class="card-body">
+                    <h4 class="card-title">Light card title</h4>
+                    <p class="card-text">Some quick example text to build on the card title and make up the bulk of the card's content.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <blockquote class="blockquote text-right">
+                  <p class="mb-0">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante.</p>
+                  <footer class="blockquote-footer">Someone famous in <cite title="Source Title">Source Title</cite></footer>
+                </blockquote>
+              </div>
+              <div class="col-lg-12">
+                <p>(end of first tab pane)</p>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="profile">
+            <p>This second tab pane content has an accordion :</p>
+            <div id="accordion">
+              <div class="card">
+                <div class="card-header" id="headingOne">
+                  <h5 class="mb-0">
+                    <button class="btn btn-link" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                      Collapsible Group Item #1
+                    </button>
+                  </h5>
+                </div>
+                <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">
+                  <div class="card-body">
+                    <div class="row">
+                      <div class="col-lg-12">
+                        <p>This accordion item contains a card and a blockquote below :</p>
+                      </div>
+                      <div class="col-lg-6">
+                        <div class="card bg-light mb-3" style="max-width: 20rem;">
+                          <div class="card-header">Header</div>
+                          <div class="card-body">
+                            <h4 class="card-title">Light card title</h4>
+                            <p class="card-text">Some quick example text to build on the card title and make up the bulk of the card's content.</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-lg-6">
+                        <blockquote class="blockquote text-right">
+                          <p class="mb-0">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante.</p>
+                          <footer class="blockquote-footer">Someone famous in <cite title="Source Title">Source Title</cite></footer>
+                        </blockquote>
+                      </div>
+                      <div class="col-lg-12">
+                        <p>(end of first accordion item)</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header" id="headingTwo">
+                  <h5 class="mb-0">
+                    <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                      Collapsible Group Item #2
+                    </button>
+                  </h5>
+                </div>
+                <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+                  <div class="card-body">
+                    Anim pariatur cliche reprehenderit, enim eiusmod high life accusamus terry richardson ad squid. 3 wolf moon officia aute, non cupidatat skateboard dolor brunch. Food truck quinoa nesciunt laborum eiusmod. Brunch 3 wolf moon tempor, sunt aliqua put a bird on it squid single-origin coffee nulla assumenda shoreditch et. Nihil anim keffiyeh helvetica, craft beer labore wes anderson cred nesciunt sapiente ea proident. Ad vegan excepteur butcher vice lomo. Leggings occaecat craft beer farm-to-table, raw denim aesthetic synth nesciunt you probably haven't heard of them accusamus labore sustainable VHS.
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header" id="headingThree">
+                  <h5 class="mb-0">
+                    <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                      Collapsible Group Item #3
+                    </button>
+                  </h5>
+                </div>
+                <div id="collapseThree" class="collapse" aria-labelledby="headingThree" data-parent="#accordion">
+                  <div class="card-body">
+                    Anim pariatur cliche reprehenderit, enim eiusmod high life accusamus terry richardson ad squid. 3 wolf moon officia aute, non cupidatat skateboard dolor brunch. Food truck quinoa nesciunt laborum eiusmod. Brunch 3 wolf moon tempor, sunt aliqua put a bird on it squid single-origin coffee nulla assumenda shoreditch et. Nihil anim keffiyeh helvetica, craft beer labore wes anderson cred nesciunt sapiente ea proident. Ad vegan excepteur butcher vice lomo. Leggings occaecat craft beer farm-to-table, raw denim aesthetic synth nesciunt you probably haven't heard of them accusamus labore sustainable VHS.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p>(end of second tab pane)</p>
+          </div>
+          <div class="tab-pane fade" id="dropdown1">
+            <p>Etsy mixtape wayfarers, ethical wes anderson tofu before they sold out mcsweeney's organic lomo retro fanny pack lo-fi farm-to-table readymade. Messenger bag gentrify pitchfork tattooed craft beer, iphone skateboard locavore carles etsy salvia banksy hoodie helvetica. DIY synth PBR banksy irony. Leggings gentrify squid 8-bit cred pitchfork.</p>
+          </div>
+          <div class="tab-pane fade" id="dropdown2">
+            <p>Trust fund seitan letterpress, keytar raw denim keffiyeh etsy art party before they sold out master cleanse gluten-free squid scenester freegan cosby sweater. Fanny pack portland seitan DIY, art party locavore wolf cliche high life echo park Austin. Cred vinyl keffiyeh DIY salvia PBR, banh mi before they sold out farm-to-table VHS viral locavore cosby sweater.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="container">
+      <h2 class="display-5">Related articles</h2>
       <div class="row">
         <div class="col-md-4">
-          <h2>Heading</h2>
+          <h3>Heading</h3>
           <p>Donec id elit non mi porta gravida at eget metus. Fusce
             dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut
             fermentum massa justo sit amet risus. Etiam porta sem malesuada magna
@@ -91,7 +201,7 @@
           <p><a class="btn btn-secondary" href="#" role="button">View details »</a></p>
         </div>
         <div class="col-md-4">
-          <h2>Heading</h2>
+          <h3>Heading</h3>
           <p>Donec id elit non mi porta gravida at eget metus. Fusce
             dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut
             fermentum massa justo sit amet risus. Etiam porta sem malesuada magna
@@ -99,7 +209,7 @@
           <p><a class="btn btn-secondary" href="#" role="button">View details »</a></p>
         </div>
         <div class="col-md-4">
-          <h2>Heading</h2>
+          <h3>Heading</h3>
           <p>Donec sed odio dui. Cras justo odio, dapibus ac facilisis in,
             egestas eget quam. Vestibulum id ligula porta felis euismod semper.
             Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh,
@@ -107,18 +217,16 @@
           <p><a class="btn btn-secondary" href="#" role="button">View details »</a></p>
         </div>
       </div>
-
-      <hr>
-
-    </div> <!-- /container -->
+    </section>
 
   </main>
 
   <footer class="container">
+    <hr>
     <p>© Company 2017-2020</p>
   </footer>
+
   <script src="assets/jquery.min.js"></script>
-  <script>window.jQuery || document.write('<script src="/docs/4.5/assets/js/vendor/jquery.slim.min.js"><\/script>')</script>
   <script src="assets/bootstrap.bundle.min.js"></script>
 
 </body>

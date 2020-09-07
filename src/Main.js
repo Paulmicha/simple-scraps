@@ -34,11 +34,11 @@ class Main extends EventEmitter {
    */
   constructor (config) {
     super()
+
     if (Array.isArray(config)) {
-      config = {
-        start: config
-      }
+      config = { start: config }
     }
+
     this.config = config
     this.pages = []
     this.openPages = {}
@@ -46,21 +46,44 @@ class Main extends EventEmitter {
     this.operations = new Queue()
     this.crawledUrls = []
     this.crawlLimits = {}
+
+    if (!('settings' in this.config)) {
+      this.config.settings = {}
+    }
   }
 
   /**
    * General config getter.
    *
    * Also provides default settings.
+   * @see src/utils/default_config.js
    */
   getSetting (setting) {
-    if (!('settings' in this.config)) {
-      this.config.settings = {}
-    }
     if (!(setting in this.config.settings)) {
       return defaultConfig.setting(setting)
     }
     return this.config.settings[setting]
+  }
+
+  /**
+   * General configs getter.
+   */
+  getSettings () {
+    return this.config.settings
+  }
+
+  /**
+   * General config setter.
+   */
+  setSetting (setting, value) {
+    this.config.settings[setting] = value
+  }
+
+  /**
+   * General configs setter.
+   */
+  setSettings (settings) {
+    Object.keys(settings).forEach(key => this.setSetting(key, settings[key]))
   }
 
   /**

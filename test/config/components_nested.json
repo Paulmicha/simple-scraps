@@ -1,0 +1,25 @@
+{
+  "settings": {
+    "crawlDelay": false
+  },
+  "start": [
+    {
+      "url": "file://test/static/Article.html",
+      "is": "content/article",
+      "extract": [
+        {
+          "selector": "body > .container",
+          "extract": "components",
+          "as": "entity.content"
+        }
+      ]
+    }
+  ],
+  "components": [
+    {
+      "selector": ".bs-docs-section:nth-child(3) .col-lg-7 .btn-primary.btn-lg",
+      "extract": "text",
+      "as": "component.Button.text"
+    }
+  ]
+}
