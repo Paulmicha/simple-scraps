@@ -4,7 +4,7 @@
  */
 
 const urlParse = require('url-parse')
-const beautifyHtml = require('js-beautify').html
+const minifyHtml = require('html-minifier-terser').minify
 
 /**
  * Extracts absolute URLs from links matched by given selector.
@@ -91,8 +91,15 @@ async function markup (page, selector, minify) {
     ))
     return arrayOrItemIfSingle(
       matches.map(
-        html => beautifyHtml(html, { indent_size: 0 })
-          .replace(/(\r\n|\n|\r)/gm, '')
+        html => minifyHtml(html, {
+          collapseWhitespace: true,
+          // For now, when requested minified, extracted HTML markup is assumed
+          // not to preserve inline display impacts of whitespace removal.
+          // See http://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace
+          // conservativeCollapse: true,
+          trimCustomFragments: true,
+          keepClosingSlash: true
+        })
       )
     )
   }
