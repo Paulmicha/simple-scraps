@@ -12,18 +12,16 @@ class Page {
   constructor (main) {
     this.main = main
 
-    // TODO refactor reflexion :
     // To avoid component nesting problem (.c-card inside another component
-    // -> multi matches from root to deepest nesting level), we need a way to
-    // start extracting deepest levels + mark the component as extracted. Thus,
-    // before actually extracting, we can check if a component was not
+    // -> potential multiple matches from root to deepest nesting levels), we
+    // need a way to start extracting deepest levels + mark the component as
+    // extracted.
+    // So before actually extracting components, we must check if a it was not
     // previously matched and already extracted.
-    // This property on the Page object itself will store all component
-    // extractors selectors (which are built recursively from config) in order
-    // to sort them. We loose the entity object recursive structure that was
-    // passively built, though. So we reconstruct an empty structure that will
-    // be "hydrated" in a 2nd pass ?
-    // this.extractionPlan = {}
+    // This property on the Page object itself will store all "components" field
+    // scope (which are built recursively from config) in order to process them
+    // them during a second "pass".
+    this.extractionPlaceholders = {}
   }
 
   /**

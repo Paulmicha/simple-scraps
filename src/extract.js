@@ -9,7 +9,7 @@ const minifyHtml = require('html-minifier-terser').minify
 /**
  * Extracts absolute URLs from links matched by given selector.
  */
-async function linksUrl (page, selector) {
+const linksUrl = async (page, selector) => {
   // Defaults to look for all <a href="..."> in the page.
   if (!selector) {
     selector = 'a[href]'
@@ -41,7 +41,7 @@ async function linksUrl (page, selector) {
  * If multiple elements match the selector, an Array will be returned, otherwise
  * a string.
  */
-async function text (page, selector, removeBreaks) {
+const text = async (page, selector, removeBreaks) => {
   /* istanbul ignore next */
   const matches = await page.$$eval(selector, items => items.map(
     item => item.textContent
@@ -68,7 +68,7 @@ async function text (page, selector, removeBreaks) {
  * many matches are found. If multiple elements match, the extracted string will
  * join them using given separator (defaults to a space in scraper settings).
  */
-async function textSingle (page, selector, separator, removeBreaks) {
+const textSingle = async (page, selector, separator, removeBreaks) => {
   const matches = await text(page, selector, removeBreaks)
   if (Array.isArray(matches)) {
     return matches.join(separator)
@@ -82,7 +82,7 @@ async function textSingle (page, selector, separator, removeBreaks) {
  * If multiple elements match the selector, an Array will be returned, otherwise
  * a string.
  */
-async function markup (page, selector, minify) {
+const markup = async (page, selector, minify) => {
   if (minify) {
     /* istanbul ignore next */
     const matches = await page.$$eval(selector, items => items.map(
@@ -121,7 +121,7 @@ async function markup (page, selector, minify) {
  * If multiple elements match the selector, an Array will be returned, otherwise
  * a string.
  */
-async function element (page, selector, callback) {
+const element = async (page, selector, callback) => {
   /* istanbul ignore next */
   return arrayOrItemIfSingle(await page.$$eval(selector, callback))
 }
@@ -130,7 +130,7 @@ async function element (page, selector, callback) {
  * Returns the first item of an array if it contains only one item, otherwise
  * returns the array.
  */
-function arrayOrItemIfSingle (result) {
+const arrayOrItemIfSingle = (result) => {
   if (!result || !result.length) {
     return
   }
@@ -143,7 +143,7 @@ function arrayOrItemIfSingle (result) {
 /**
  * Returns the extrators matching given entity type.
  */
-function match (entityType, main) {
+const match = (entityType, main) => {
   let extractors = []
 
   Object.keys(main.config)
@@ -165,7 +165,7 @@ function match (entityType, main) {
  * - <thing>.<type>.<prop> (ex: component.Lede.text)
  * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
  */
-function as (extractor, onlyTail) {
+const as = (extractor, onlyTail) => {
   const parts = extractor.as.split('.')
 
   if (onlyTail) {
@@ -180,20 +180,11 @@ function as (extractor, onlyTail) {
  *
  * This is called recursively to allow nested components extraction.
  */
-async function run (o) {
-  const { extractor, extracted, pageWorker, main, fieldOverride, parentExtractor } = o
+const run = async (o) => {
+  const { extractor, extracted, pageWorker, main, fieldOverride } = o
 
   // Preprocess selectors to handle scope in recusrive calls and customizations.
-  // TODO [wip] need to mark scoped elements as "already extracted" to avoid
-  // selectors potentially matching multiple times the same element during
-  // nested components extraction.
-  // Example :
-  //  - a Card component is matched from "root" scope once
-  //  - a NavTabs component has a tab pane content that also extracts components
-  //  - if one of its panes contains a Card component, it may be matched again
-  // -> We need a way to start from deepest levels and mark components as
-  // already extracted so they can be skipped from "higher" levels (up to root).
-  selectorPreProcess(o)
+  preprocessExtractor(o)
 
   // Debug.
   // console.log(Object.keys(o))
@@ -245,10 +236,119 @@ async function run (o) {
     case 'element':
       await elementFieldProcess({ extractor, extracted, pageWorker, main, field })
       break
-    case 'components':
-      await componentsFieldProcess({ extractor, extracted, pageWorker, main, field })
+    // In order to support nested components extraction, we need to start from
+    // the "deepest" nesting levels to avoid matching the same elements multiple
+    // times. This is achieved by storing 'components' fields aside for later
+    // processing during a second "pass", where we'll be able to scope
+    // extraction and mark extracted components to avoid potential duplicates.
+    // @see runSecondPass()
+    case 'components': {
+      // TODO refactor in progress
+      // await componentsFieldProcess({ extractor, extracted, pageWorker, main, field })
+
+      const componentsFieldPlaceholder = {}
+      extracted[field] = componentsFieldPlaceholder
+
+      // Store references to placeholder objects in a single property directly
+      // on the page worker instance for easier processing later on.
+      pageWorker.extractionPlaceholders[extractor.ancestorsChain] = {
+        placeholder: componentsFieldPlaceholder,
+        context: o
+      }
       break
+    }
   }
+}
+
+/**
+ * Preprocessor allowing components nesting, scope, and custom selectors.
+ *
+ * This facilitates scope handling, allows customizations and jQuery-like
+ * selector syntax if there is a DOM Query Helper available in browsed page(s).
+ * @see Page.addDomQueryHelper()
+ *
+ * If the extractor has a 'preprocess' key, its value serves as the event
+ * emitted to allow custom implementations that would prepare elements (e.g. add
+ * custom classes) to facilitate the extraction process.
+ *
+ * Examples of jQuery-like syntax :
+ *   1. Set a custom class on parent element and use it as new scope :
+ *     "selector": ".nav-tabs.parent()"
+ *   2. Idem, but using closest() to set scope in any ancestor (stops at closest
+ *    match) :
+ *     "selector": ".nav-tabs.closest(section)"
+ *   3. Going up then down the DOM tree :
+ *     "selector": ".nav-tabs.closest(section).find(.something)"
+ *
+ * TODO evaluate alternative to provide an array of selectors to deal with cases
+ * where we need to build a single component out of multiple elements that do
+ * not share a "not too distant" common ancestor.
+ */
+const preprocessExtractor = (o) => {
+  const { extractor, main, parentExtractor } = o
+
+  // Assign an "ancestor chain" string to the extractor. It will we used for
+  // easier processing during the second pass for nested components extraction.
+  // @see run()
+  let ancestors = []
+  let ancestorsChain = ''
+
+  if (parentExtractor) {
+    // Prevent infinite loops by checking this extractor hasn't run already in
+    // given scope.
+    if (extractor.ancestors && extractor.ancestors.includes(parentExtractor)) {
+      extractor.stopRecursiveLookup = true
+      return
+    }
+
+    extractor.parent = parentExtractor
+    ancestors = getExtractorAncestors(extractor)
+    ancestorsChain = ancestors.map(e => e.as).join('->') + '->'
+
+    // Also assign a scope for current extractor, and prepend selector for
+    // ensuring correct nesting during recusrive calls.
+    extractor.scope = parentExtractor.selector
+    extractor.selector = `${parentExtractor.selector} ${extractor.selector}`
+  }
+
+  extractor.depth = ancestors.length
+  extractor.ancestors = ancestors
+  extractor.ancestorsChain = ancestorsChain + extractor.as
+
+  // Call any custom 'preprocess' implementations.
+  if ('preprocess' in extractor) {
+    main.emit(extractor.preprocess, o)
+  }
+
+  // Debug.
+  const debugIndent = '  '.repeat(extractor.depth)
+  console.log(`${debugIndent}${ancestorsChain}${extractor.as}`)
+  if (parentExtractor) {
+    console.log(`${debugIndent}  ( ${parentExtractor.selector}`)
+    console.log(`${debugIndent}    ${extractor.selector} )`)
+  } else {
+    console.log(`${debugIndent}  ( ${extractor.selector} )`)
+  }
+
+  // TODO [wip] next iteration :
+  // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
+  // classes).
+  // if (main.getSetting('addDomQueryHelper')) {
+  // }
+}
+
+/**
+ * Returns an array of extractors that represents the "nesting chain".
+ *
+ * @param {object} extractor
+ */
+const getExtractorAncestors = (extractor) => {
+  const ancestors = []
+  while (extractor.parent) {
+    ancestors.push(extractor.parent)
+    extractor = extractor.parent
+  }
+  return ancestors.reverse()
 }
 
 /**
@@ -294,7 +394,7 @@ async function run (o) {
  * single child item. Any element matched outside of this selector does not
  * belong to the same item.
  */
-async function subItemsFieldProcess (o) {
+const subItemsFieldProcess = async (o) => {
   const { extractor, extracted, pageWorker, main, field } = o
 
   // Debug.
@@ -386,7 +486,7 @@ async function subItemsFieldProcess (o) {
  * Example callback function :
  *  items => items.map(item => item.innerHTML)
  */
-async function elementFieldProcess (o) {
+const elementFieldProcess = async (o) => {
   const { extractor, extracted, pageWorker, main, field } = o
 
   if (!extractor.emit) {
@@ -413,6 +513,18 @@ async function elementFieldProcess (o) {
 }
 
 /**
+ * Runs the second pass.
+ */
+const secondPass = async (o) => {
+  const { extracted, pageWorker, main } = o
+
+  // TODO (wip)
+  console.log('secondPass()')
+  console.log(pageWorker.extractionPlaceholders)
+  // console.log(extracted)
+}
+
+/**
  * Sub-processes 'components' fields.
  *
  * Some component extractors have a single prop destination, e.g. :
@@ -424,11 +536,11 @@ async function elementFieldProcess (o) {
  * destination would be e.g. :
  *  "as": "component.MediaGrid"
  */
-async function componentsFieldProcess (o) {
+const componentsFieldProcess = async (o) => {
   const { extractor, extracted, pageWorker, main, field } = o
 
   // Prevent infinite loops during nested components lookup.
-  // @see selectorPreProcess()
+  // @see preprocessExtractor()
   if (extractor.stopRecursiveLookup) {
     return
   }
@@ -587,7 +699,7 @@ async function componentsFieldProcess (o) {
  * Expected structure (output) :
  *  { c: "Lede", props: { text: "<p>markup contents</p>" }}
  */
-function componentEntityToObject (componentEntity, type, prop) {
+const componentEntityToObject = (componentEntity, type, prop) => {
   const transformedObject = {}
   transformedObject.c = type
   transformedObject.props = {}
@@ -603,100 +715,12 @@ function componentEntityToObject (componentEntity, type, prop) {
   return transformedObject
 }
 
-/**
- * Preprocesses all selectors before extraction nbegins.
- *
- * This facilitates scope handling, allows customizations and jQuery-like
- * selector syntax if there is a DOM Query Helper available in browsed page(s).
- * @see Page.addDomQueryHelper()
- *
- * If the extractor has a 'preprocess' key, its value serves as the event
- * emitted to allow custom implementations that would prepare elements (e.g. add
- * custom classes) to facilitate the extraction process.
- *
- * Examples of jQuery-like syntax :
- *   1. Set a custom class on parent element and use it as new scope :
- *     "selector": ".nav-tabs.parent()"
- *   2. Idem, but using closest() to set scope in any ancestor (stops at closest
- *    match) :
- *     "selector": ".nav-tabs.closest(section)"
- *   3. Going up then down the DOM tree :
- *     "selector": ".nav-tabs.closest(section).find(.something)"
- *
- * TODO evaluate alternative to provide an array of selectors to deal with cases
- * where we need to build a single component out of multiple elements that do
- * not share a "not too distant" common ancestor.
- */
-const selectorPreProcess = (o) => {
-  const { extractor, main, parentExtractor } = o
-
-  if (parentExtractor) {
-    extractor.parent = parentExtractor
-  }
-
-  // Debug.
-  let ancestors = []
-  let ancestorsChain = ''
-  if (extractor.parent) {
-    ancestors = getExtractorAncestors(extractor)
-    ancestorsChain = ancestors.map(e => e.as).join(' . ')
-    ancestorsChain += ' . '
-  }
-  const debugIndent = '  '.repeat(ancestors.length)
-  console.log(`${debugIndent}${ancestorsChain}${extractor.as}`)
-  if (parentExtractor) {
-    console.log(`${debugIndent}  ( ${parentExtractor.selector}`)
-    console.log(`${debugIndent}    ${extractor.selector} )`)
-  } else {
-    console.log(`${debugIndent}  ( ${extractor.selector} )`)
-  }
-
-  // First, call any custom 'preprocess' implementations.
-  if ('preprocess' in extractor) {
-    main.emit(extractor.preprocess, o)
-  }
-
-  // TODO [wip] next iteration :
-  // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
-  // classes).
-  // if (main.getSetting('addDomQueryHelper')) {
-  // }
-
-  // Scope the selector if we have a parent, otherwise set as empty string
-  // to mean global scope (window).
-  if (parentExtractor) {
-    // Prevent infinite loops during nested components lookup.
-    // @see componentsFieldProcess()
-    if (extractor.parents && !extractor.parents.includes(parentExtractor)) {
-      extractor.stopRecursiveLookup = true
-      return
-    } else {
-      extractor.parents = []
-    }
-    extractor.scope = parentExtractor.selector
-    extractor.selector = `${parentExtractor.selector} ${extractor.selector}`
-    // extractor.parent = parentExtractor
-    extractor.parents.push(parentExtractor)
-    extractor.depth = extractor.parents.length
-  } else {
-    extractor.scope = ''
-  }
-}
-
-function getExtractorAncestors(extractor) {
-  const ancestors = []
-  while (extractor.parent) {
-    ancestors.push(extractor.parent)
-    extractor = extractor.parent
-  }
-  return ancestors.reverse()
-}
-
 module.exports = {
   linksUrl,
   element,
   markup,
   text,
   match,
-  run
+  run,
+  secondPass
 }

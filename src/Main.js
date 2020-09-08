@@ -416,6 +416,9 @@ class Main extends EventEmitter {
       await extract.run({ extractor, extracted: entity, pageWorker, main: this })
     }
 
+    // Runs the second pass to allow nested components extraction.
+    await extract.secondPass({ extracted: entity, pageWorker, main: this })
+
     // Allow alterations before saving.
     this.emit('alter.extraction.result', entity, entityType, bundle, pageWorker)
 
