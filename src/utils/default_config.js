@@ -39,6 +39,8 @@ const setting = (key) => {
       return ' '
     case 'minifyExtractedHtml':
       return true
+    case 'maxExtractionNestingDepth':
+      return 3
   }
 }
 

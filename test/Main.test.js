@@ -92,18 +92,13 @@ test.serial('2. Extract a simple component', async t => {
   })
 
   scraps.on('store.extraction.result', (entity) => {
-    // Debug. (wip)
-    console.log('2. entity.content')
-    console.log(entity.content)
-    t.pass()
-    // t.is('Button', entity.content[0].c)
-    // t.is('Large button', entity.content[0].props.text)
+    t.is('Button', entity.content[0].c)
+    t.is('Large button', entity.content[0].props.text)
   })
 
   await scraps.run()
 })
 
-/*
 test.serial('3. Extract nested components', async t => {
   const scraps = new SimpleScraps(nestedComponentsConfig)
 
@@ -130,4 +125,3 @@ test.serial('3. Extract nested components', async t => {
 
   await scraps.run()
 })
- */

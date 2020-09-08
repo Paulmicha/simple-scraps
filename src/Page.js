@@ -12,6 +12,9 @@ class Page {
   constructor (main) {
     this.main = main
 
+    // TODO (wip) other refactor in progress.
+    this.componentsExtracted = []
+
     // To avoid component nesting problem (.c-card inside another component
     // -> potential multiple matches from root to deepest nesting levels), we
     // need a way to start extracting deepest levels + mark the component as
@@ -22,7 +25,7 @@ class Page {
     // scope (which are built recursively from config) in order to process them
     // them during a second "pass".
     // @see runSecondPass() in src/extract.js
-    this.extractionPlaceholders = []
+    // this.extractionPlaceholders = []
   }
 
   /**

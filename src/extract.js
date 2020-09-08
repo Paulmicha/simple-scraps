@@ -185,7 +185,13 @@ const run = async (o) => {
   const { extractor, extracted, pageWorker, main, fieldOverride } = o
 
   // Preprocess selectors to handle scope in recusrive calls and customizations.
-  preprocessExtractor(o)
+  // Also imposes a depth limit for nested extraction process to avoid infinite
+  // recursions for components including components.
+  // @see preprocessExtractor()
+  const carryOn = preprocessExtractor(o)
+  if (!carryOn) {
+    return
+  }
 
   // Debug.
   // console.log(Object.keys(o))
@@ -244,9 +250,10 @@ const run = async (o) => {
     // extraction and mark extracted components to avoid potential duplicates.
     // @see runrunSecondPass()
     case 'components': {
-      // TODO refactor in progress
-      // await componentsFieldProcess({ extractor, extracted, pageWorker, main, field })
+      await componentsFieldProcess({ extractor, extracted, pageWorker, main, field })
 
+      // TODO other refactor in progress.
+      /*
       // This placeholder sits in the exact place in the extracted object where
       // components will be looked for and merged during the second pass.
       const componentsFieldPlaceholder = {}
@@ -263,6 +270,7 @@ const run = async (o) => {
       // We still need to look ahead for "seeding" components nesting other
       // components.
       // TODO (wip)
+      */
       break
     }
   }
@@ -291,6 +299,8 @@ const run = async (o) => {
  * TODO evaluate alternative to provide an array of selectors to deal with cases
  * where we need to build a single component out of multiple elements that do
  * not share a "not too distant" common ancestor.
+ *
+ * @returns {boolean} carry on or stops the recursive extraction process.
  */
 const preprocessExtractor = (o) => {
   const { extractor, main, parentExtractor } = o
@@ -316,6 +326,12 @@ const preprocessExtractor = (o) => {
   extractor.ancestors = ancestors
   extractor.ancestorsChain = ancestorsChain + extractor.as
 
+  // Impose a depth limit, otherwise there would be inevitable infinite loops
+  // when components include other components.
+  if (extractor.depth > main.getSetting('maxExtractionNestingDepth')) {
+    return false
+  }
+
   // Call any custom 'preprocess' implementations.
   if ('preprocess' in extractor) {
     main.emit(extractor.preprocess, o)
@@ -331,6 +347,8 @@ const preprocessExtractor = (o) => {
   // classes).
   // if (main.getSetting('addDomQueryHelper')) {
   // }
+
+  return true
 }
 
 /**
@@ -593,11 +611,20 @@ const componentsFieldProcess = async (o) => {
 
   // Prevent infinite loops during nested components lookup.
   // @see preprocessExtractor()
+  if (extractor.ancestorsChain.length) {
+    if (pageWorker.componentsExtracted.includes(extractor.ancestorsChain)) {
+      // Debug.
+      console.log(`  abort due to already processed ${extractor.ancestorsChain}`)
+      return
+    }
+    pageWorker.componentsExtracted.push(extractor.ancestorsChain)
+  }
+
   // if (extractor.stopRecursiveLookup) {
   //   return
   // }
-  // // Prevent infinite loops by checking this extractor hasn't run already in
-  // // given scope.
+  // Prevent infinite loops by checking this extractor hasn't run already in
+  // given scope.
   // if (extractor.ancestors && extractor.ancestors.includes(parentExtractor)) {
   //   extractor.stopRecursiveLookup = true
   //   return
@@ -627,7 +654,6 @@ const componentsFieldProcess = async (o) => {
     // Otherwise, the "extract" key contains an array of sub-extractors which
     // must all run on the same component object.
     if (!Array.isArray(componentExtractor.extract)) {
-
       // Debug.
       console.log('  Single extractor component definition')
 
