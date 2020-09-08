@@ -32,7 +32,7 @@
         {
           "selector": "> .tab-content > .tab-pane",
           "extract": "components",
-          "as": "component.MediaGrid.items[].content"
+          "as": "component.NavTabs.items[].content"
         }
       ],
       "as": "component.NavTabs"

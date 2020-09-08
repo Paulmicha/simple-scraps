@@ -113,12 +113,14 @@ test.serial('3. Extract nested components', async t => {
     // t.is(2, entity.content.length)
 
     // Debug.
-    console.log('TODO (wip) Extract nested components :')
+    // console.log('TODO (wip) Extract nested components :')
     // console.log([entity, entityType, bundle, url])
     // console.log(entity.content)
     // console.log(entity.content[1].props)
     // console.log(entity.content[1].props.items[0].content)
-    console.log(JSON.stringify(entity, null, 2))
+    // console.log(JSON.stringify(entity, null, 2))
+    console.log('TODO (wip) Extracted NavTabs component :')
+    console.log(JSON.stringify(entity.content[1].props, null, 2))
   })
 
   await scraps.run()

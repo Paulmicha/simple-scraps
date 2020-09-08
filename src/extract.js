@@ -181,7 +181,7 @@ function as (extractor, onlyTail) {
  * This is called recursively to allow nested components extraction.
  */
 async function run (o) {
-  const { extractor, extracted, pageWorker, main, fieldOverride } = o
+  const { extractor, extracted, pageWorker, main, fieldOverride, parentExtractor } = o
 
   // Preprocess selectors to handle scope in recusrive calls and customizations.
   // TODO [wip] need to mark scoped elements as "already extracted" to avoid
@@ -198,9 +198,9 @@ async function run (o) {
   // Debug.
   // console.log(Object.keys(o))
   // console.log(extractor)
-  console.log(
-    `run() - extract '${extractor.selector}' as ${as(extractor).join(':')}`
-  )
+  // console.log(
+  //   `run() - extract '${extractor.selector}' as ${as(extractor).join(':')}`
+  // )
 
   // By default, the field (or property) that is being extracted is the 2nd part
   // of the "as" key, but it needs to be overridable for nested components.
@@ -241,6 +241,7 @@ async function run (o) {
         main.getSetting('minifyExtractedHtml')
       )
       break
+    // TODO implement an extraction for attribute(s).
     case 'element':
       await elementFieldProcess({ extractor, extracted, pageWorker, main, field })
       break
@@ -258,8 +259,25 @@ async function run (o) {
  * - component.MediaGrid.items[].title
  * - component.MediaGrid.items[].text
  *
- * TODO (wip) write tests for deeper nesting levels, e.g. :
+ * For now, there is NO support for deeper levels - e.g. :
  * - component.MediaGrid.items[].nested[].value
+ * In these situations, nested child components are expected instead - e.g. :
+ *   {
+ *     "selector": "header + section > .bs-component",
+ *     "extract": [
+ *       {
+ *         "selector": "> .nav-tabs > li > .nav-link",
+ *         "extract": "text",
+ *         "as": "component.NavTabs.items[].title"
+ *       },
+ *       {
+ *         "selector": "> .tab-content > .tab-pane",
+ *         "extract": "components",
+ *         "as": "component.MediaGrid.items[].content"
+ *       }
+ *     ],
+ *     "as": "component.NavTabs"
+ *   }
  *
  * When the destination contains the string '[]', it means that we need to
  * create an array of objects. Each object can have 1 or many fields (or props).
@@ -409,6 +427,12 @@ async function elementFieldProcess (o) {
 async function componentsFieldProcess (o) {
   const { extractor, extracted, pageWorker, main, field } = o
 
+  // Prevent infinite loops during nested components lookup.
+  // @see selectorPreProcess()
+  if (extractor.stopRecursiveLookup) {
+    return
+  }
+
   // TODO evaluate wildcards for doing things like :
   //  "extract": "components.nested"
   // which could contain e.g. only selector overrides based on the "base"
@@ -420,7 +444,7 @@ async function componentsFieldProcess (o) {
   const components = []
 
   for (let i = 0; i < main.config.components.length; i++) {
-    const componentExtractor = main.config.components[i]
+    const componentExtractor = { ...main.config.components[i] }
     const component = {}
     const [thing, type, prop] = as(componentExtractor)
 
@@ -445,8 +469,10 @@ async function componentsFieldProcess (o) {
       // simpler ones (that can be dealt with in a single run).
       const regroupedExtractors = {}
 
-      while (componentExtractor.extract.length) {
-        const subExtractor = componentExtractor.extract.shift()
+      // while (componentExtractor.extract.length) {
+      //   const subExtractor = componentExtractor.extract.shift()
+      for (let j = 0; j < componentExtractor.extract.length; j++) {
+        const subExtractor = componentExtractor.extract[j]
         const destination = as(subExtractor)
         let groupBy = destination[2]
 
@@ -499,7 +525,7 @@ async function componentsFieldProcess (o) {
       const fields = Object.keys(regroupedExtractors)
 
       // Debug.
-      // console.log('fields :')
+      // console.log('component fields :')
       // console.log(fields)
 
       for (let i = 0; i < fields.length; i++) {
@@ -601,11 +627,31 @@ function componentEntityToObject (componentEntity, type, prop) {
  * where we need to build a single component out of multiple elements that do
  * not share a "not too distant" common ancestor.
  */
-// const selectorPreProcess = (extractor, main, parentExtractor) => {
 const selectorPreProcess = (o) => {
   const { extractor, main, parentExtractor } = o
 
-  // First, detect and call any custom 'preprocess' implementations.
+  if (parentExtractor) {
+    extractor.parent = parentExtractor
+  }
+
+  // Debug.
+  let ancestors = []
+  let ancestorsChain = ''
+  if (extractor.parent) {
+    ancestors = getExtractorAncestors(extractor)
+    ancestorsChain = ancestors.map(e => e.as).join(' . ')
+    ancestorsChain += ' . '
+  }
+  const debugIndent = '  '.repeat(ancestors.length)
+  console.log(`${debugIndent}${ancestorsChain}${extractor.as}`)
+  if (parentExtractor) {
+    console.log(`${debugIndent}  ( ${parentExtractor.selector}`)
+    console.log(`${debugIndent}    ${extractor.selector} )`)
+  } else {
+    console.log(`${debugIndent}  ( ${extractor.selector} )`)
+  }
+
+  // First, call any custom 'preprocess' implementations.
   if ('preprocess' in extractor) {
     main.emit(extractor.preprocess, o)
   }
@@ -619,11 +665,31 @@ const selectorPreProcess = (o) => {
   // Scope the selector if we have a parent, otherwise set as empty string
   // to mean global scope (window).
   if (parentExtractor) {
+    // Prevent infinite loops during nested components lookup.
+    // @see componentsFieldProcess()
+    if (extractor.parents && !extractor.parents.includes(parentExtractor)) {
+      extractor.stopRecursiveLookup = true
+      return
+    } else {
+      extractor.parents = []
+    }
     extractor.scope = parentExtractor.selector
     extractor.selector = `${parentExtractor.selector} ${extractor.selector}`
+    // extractor.parent = parentExtractor
+    extractor.parents.push(parentExtractor)
+    extractor.depth = extractor.parents.length
   } else {
     extractor.scope = ''
   }
+}
+
+function getExtractorAncestors(extractor) {
+  const ancestors = []
+  while (extractor.parent) {
+    ancestors.push(extractor.parent)
+    extractor = extractor.parent
+  }
+  return ancestors.reverse()
 }
 
 module.exports = {
