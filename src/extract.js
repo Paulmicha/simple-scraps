@@ -5,6 +5,7 @@
 
 const urlParse = require('url-parse')
 const minifyHtml = require('html-minifier-terser').minify
+const { compare } = require('specificity')
 
 /**
  * Extracts absolute URLs from links matched by given selector.
@@ -239,22 +240,29 @@ const run = async (o) => {
     // In order to support nested components extraction, we need to start from
     // the "deepest" nesting levels to avoid matching the same elements multiple
     // times. This is achieved by storing 'components' fields aside for later
-    // processing during a second "pass", where we'll be able to scope
+    // processing during a second extraction pass, where we'll be able to scope
     // extraction and mark extracted components to avoid potential duplicates.
-    // @see runSecondPass()
+    // @see runrunSecondPass()
     case 'components': {
       // TODO refactor in progress
       // await componentsFieldProcess({ extractor, extracted, pageWorker, main, field })
 
+      // This placeholder sits in the exact place in the extracted object where
+      // components will be looked for and merged during the second pass.
       const componentsFieldPlaceholder = {}
       extracted[field] = componentsFieldPlaceholder
 
       // Store references to placeholder objects in a single property directly
       // on the page worker instance for easier processing later on.
-      pageWorker.extractionPlaceholders[extractor.ancestorsChain] = {
+      // @see runSecondPass()
+      pageWorker.extractionPlaceholders.push({
         placeholder: componentsFieldPlaceholder,
         context: o
-      }
+      })
+
+      // We still need to look ahead for "seeding" components nesting other
+      // components.
+      // TODO (wip)
       break
     }
   }
@@ -294,16 +302,9 @@ const preprocessExtractor = (o) => {
   let ancestorsChain = ''
 
   if (parentExtractor) {
-    // Prevent infinite loops by checking this extractor hasn't run already in
-    // given scope.
-    if (extractor.ancestors && extractor.ancestors.includes(parentExtractor)) {
-      extractor.stopRecursiveLookup = true
-      return
-    }
-
     extractor.parent = parentExtractor
     ancestors = getExtractorAncestors(extractor)
-    ancestorsChain = ancestors.map(e => e.as).join('->') + '->'
+    ancestorsChain = ancestors.map(e => e.as).join(' <- ') + ' <- '
 
     // Also assign a scope for current extractor, and prepend selector for
     // ensuring correct nesting during recusrive calls.
@@ -322,13 +323,8 @@ const preprocessExtractor = (o) => {
 
   // Debug.
   const debugIndent = '  '.repeat(extractor.depth)
-  console.log(`${debugIndent}${ancestorsChain}${extractor.as}`)
-  if (parentExtractor) {
-    console.log(`${debugIndent}  ( ${parentExtractor.selector}`)
-    console.log(`${debugIndent}    ${extractor.selector} )`)
-  } else {
-    console.log(`${debugIndent}  ( ${extractor.selector} )`)
-  }
+  console.log(`${debugIndent}depth ${extractor.depth} : ${extractor.ancestorsChain}`)
+  console.log(`${debugIndent}  ( ${extractor.selector} )`)
 
   // TODO [wip] next iteration :
   // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
@@ -513,13 +509,66 @@ const elementFieldProcess = async (o) => {
 }
 
 /**
- * Runs the second pass.
+ * Runs a second extraction pass for nested components support.
+ *
+ * To avoid component nesting problem (e.g. ".card" inside another component
+ * -> potential multiple matches from root to deepest nesting levels), we needed
+ * a way to start by extracting the deepest levels first and mark the components
+ * as extracted.
+ *
+ * This makes use of a property on the page worker instance itself which stores
+ * all 'components' fields placeholder objects (which are built recursively from
+ * config) in order to handle the processing in the correct order during this
+ * second "pass".
+ *
+ * Nesting depth detection uses extractors' ancestors count, and in case of
+ * equality, we compare CSS selectors specificity - after custom jQuery-like
+ * syntax was converted by preprocessExtractor().
+ *
+ * See https://github.com/keeganstreet/specificity
  */
-const secondPass = async (o) => {
+const runSecondPass = async (o) => {
   const { extracted, pageWorker, main } = o
 
+  // Debug.
+  console.log('')
+  console.log('second pass - pageWorker.extractionPlaceholders')
+  console.log(pageWorker.extractionPlaceholders.map(p => p.context.extractor.ancestorsChain))
+
+  // Nothing to do if no components fields were set in config.
+  if (!pageWorker.extractionPlaceholders.length) {
+    return
+  }
+
+  // No need to compare anything if there's only a single components field.
+  if (pageWorker.extractionPlaceholders.length === 1) {
+    const extractionPlaceholder = pageWorker.extractionPlaceholders.pop()
+    await componentsFieldProcess(extractionPlaceholder.context)
+
+    // debug
+    extractionPlaceholder.placeholder.test_field = 'test value'
+
+    return
+  }
+
+  // Sort placeholders by most deeply nested then CSS selectors specificity.
+  pageWorker.extractionPlaceholders.sort((a, b) => {
+    // 'a' is less specific than 'b' (= less deeply nested).
+    if (a.context.extractor.depth < b.context.extractor.depth) {
+      return -1
+    }
+    // 'a' is more specific than 'b' (= nested deeper).
+    if (a.context.extractor.depth > b.context.extractor.depth) {
+      return 1
+    }
+    // Equality leads to CSS selectors specificity comparison.
+    if (a.context.extractor.depth === b.context.extractor.depth) {
+      return compare(a.context.extractor.selector, b.context.extractor.selector)
+    }
+  })
+
   // TODO (wip)
-  console.log('secondPass()')
+  console.log('runSecondPass() - sorting result :')
   console.log(pageWorker.extractionPlaceholders)
   // console.log(extracted)
 }
@@ -539,11 +588,20 @@ const secondPass = async (o) => {
 const componentsFieldProcess = async (o) => {
   const { extractor, extracted, pageWorker, main, field } = o
 
+  // Debug.
+  console.log('componentsFieldProcess()')
+
   // Prevent infinite loops during nested components lookup.
   // @see preprocessExtractor()
-  if (extractor.stopRecursiveLookup) {
-    return
-  }
+  // if (extractor.stopRecursiveLookup) {
+  //   return
+  // }
+  // // Prevent infinite loops by checking this extractor hasn't run already in
+  // // given scope.
+  // if (extractor.ancestors && extractor.ancestors.includes(parentExtractor)) {
+  //   extractor.stopRecursiveLookup = true
+  //   return
+  // }
 
   // TODO evaluate wildcards for doing things like :
   //  "extract": "components.nested"
@@ -560,12 +618,19 @@ const componentsFieldProcess = async (o) => {
     const component = {}
     const [thing, type, prop] = as(componentExtractor)
 
+    // Debug.
+    console.log(componentExtractor.as)
+
     // For components having a single prop to extract, e.g. :
     //  "as": "component.Lede.text"
     // we can handle these in a single run.
     // Otherwise, the "extract" key contains an array of sub-extractors which
     // must all run on the same component object.
     if (!Array.isArray(componentExtractor.extract)) {
+
+      // Debug.
+      console.log('  Single extractor component definition')
+
       await run({
         extractor: componentExtractor,
         parentExtractor: extractor,
@@ -637,15 +702,16 @@ const componentsFieldProcess = async (o) => {
       const fields = Object.keys(regroupedExtractors)
 
       // Debug.
-      // console.log('component fields :')
-      // console.log(fields)
+      console.log('  Multiple extractors component definition')
+      console.log('    component fields :')
+      console.log(fields)
 
       for (let i = 0; i < fields.length; i++) {
         const field = fields[i]
 
         // Debug.
-        // console.log('subExtractors :')
-        // console.log(regroupedExtractors[field].map(e => e.as))
+        console.log('    subExtractors :')
+        console.log(regroupedExtractors[field].map(e => e.as))
 
         const subExtractors = regroupedExtractors[field]
         let newExtractor = { as: `${thing}.${type}.${field}` }
@@ -722,5 +788,5 @@ module.exports = {
   text,
   match,
   run,
-  secondPass
+  runSecondPass
 }

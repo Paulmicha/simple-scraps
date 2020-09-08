@@ -21,7 +21,8 @@ class Page {
     // This property on the Page object itself will store all "components" field
     // scope (which are built recursively from config) in order to process them
     // them during a second "pass".
-    this.extractionPlaceholders = {}
+    // @see runSecondPass() in src/extract.js
+    this.extractionPlaceholders = []
   }
 
   /**
