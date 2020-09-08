@@ -316,6 +316,16 @@ const preprocessExtractor = (o) => {
     ancestors = getExtractorAncestors(extractor)
     ancestorsChain = ancestors.map(e => e.as).join(' <- ') + ' <- '
 
+    // TODO find out why the fact of looking for a component instance inside
+    // itself leads to memory leak, despite the limit on maximum depth.
+    if (ancestorsChain.includes(` <- ${extractor.as} <- `)) {
+      // Debug.
+      // console.log('')
+      // console.log(`  Forbid to look for instances of a component inside itself (${extractor.as} in '${ancestorsChain}')`)
+      // console.log('')
+      return false
+    }
+
     // Also assign a scope for current extractor, and prepend selector for
     // ensuring correct nesting during recusrive calls.
     extractor.scope = parentExtractor.selector
@@ -641,6 +651,7 @@ const componentsFieldProcess = async (o) => {
   const components = []
 
   for (let i = 0; i < main.config.components.length; i++) {
+    // const componentExtractor = main.config.components[i]
     const componentExtractor = { ...main.config.components[i] }
     const component = {}
     const [thing, type, prop] = as(componentExtractor)
@@ -740,7 +751,10 @@ const componentsFieldProcess = async (o) => {
         console.log(regroupedExtractors[field].map(e => e.as))
 
         const subExtractors = regroupedExtractors[field]
-        let newExtractor = { as: `${thing}.${type}.${field}` }
+        let newExtractor = {
+          as: `${thing}.${type}.${field}`,
+          parentExtractor: componentExtractor
+        }
 
         // Simple props have a single extractor which can be used "as is".
         // Multi-field sub-items need 1 'extract' array item per field.
