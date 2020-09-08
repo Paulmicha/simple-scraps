@@ -537,71 +537,6 @@ const elementFieldProcess = async (o) => {
 }
 
 /**
- * Runs a second extraction pass for nested components support.
- *
- * To avoid component nesting problem (e.g. ".card" inside another component
- * -> potential multiple matches from root to deepest nesting levels), we needed
- * a way to start by extracting the deepest levels first and mark the components
- * as extracted.
- *
- * This makes use of a property on the page worker instance itself which stores
- * all 'components' fields placeholder objects (which are built recursively from
- * config) in order to handle the processing in the correct order during this
- * second "pass".
- *
- * Nesting depth detection uses extractors' ancestors count, and in case of
- * equality, we compare CSS selectors specificity - after custom jQuery-like
- * syntax was converted by preprocessExtractor().
- *
- * See https://github.com/keeganstreet/specificity
- */
-const runSecondPass = async (o) => {
-  const { extracted, pageWorker, main } = o
-
-  // Debug.
-  console.log('')
-  console.log('second pass - pageWorker.extractionPlaceholders')
-  console.log(pageWorker.extractionPlaceholders.map(p => p.context.extractor.ancestorsChain))
-
-  // Nothing to do if no components fields were set in config.
-  if (!pageWorker.extractionPlaceholders.length) {
-    return
-  }
-
-  // No need to compare anything if there's only a single components field.
-  if (pageWorker.extractionPlaceholders.length === 1) {
-    const extractionPlaceholder = pageWorker.extractionPlaceholders.pop()
-    await componentsFieldProcess(extractionPlaceholder.context)
-
-    // debug
-    extractionPlaceholder.placeholder.test_field = 'test value'
-
-    return
-  }
-
-  // Sort placeholders by most deeply nested then CSS selectors specificity.
-  pageWorker.extractionPlaceholders.sort((a, b) => {
-    // 'a' is less specific than 'b' (= less deeply nested).
-    if (a.context.extractor.depth < b.context.extractor.depth) {
-      return -1
-    }
-    // 'a' is more specific than 'b' (= nested deeper).
-    if (a.context.extractor.depth > b.context.extractor.depth) {
-      return 1
-    }
-    // Equality leads to CSS selectors specificity comparison.
-    if (a.context.extractor.depth === b.context.extractor.depth) {
-      return compare(a.context.extractor.selector, b.context.extractor.selector)
-    }
-  })
-
-  // TODO (wip)
-  console.log('runSecondPass() - sorting result :')
-  console.log(pageWorker.extractionPlaceholders)
-  // console.log(extracted)
-}
-
-/**
  * Sub-processes 'components' fields.
  *
  * Some component extractors have a single prop destination, e.g. :
@@ -751,10 +686,7 @@ const componentsFieldProcess = async (o) => {
         console.log(regroupedExtractors[field].map(e => e.as))
 
         const subExtractors = regroupedExtractors[field]
-        let newExtractor = {
-          as: `${thing}.${type}.${field}`,
-          parentExtractor: componentExtractor
-        }
+        let newExtractor = { as: `${thing}.${type}.${field}` }
 
         // Simple props have a single extractor which can be used "as is".
         // Multi-field sub-items need 1 'extract' array item per field.
@@ -787,10 +719,12 @@ const componentsFieldProcess = async (o) => {
       }
 
       // Debug.
-      // console.log('component :')
-      // console.log(component)
+      console.log('component :')
+      console.log(component)
 
-      components.push(componentEntityToObject(component, type, fields))
+      if (Object.keys(component).length !== 0) {
+        components.push(componentEntityToObject(component, type, fields))
+      }
     }
   }
 
@@ -819,6 +753,71 @@ const componentEntityToObject = (componentEntity, type, prop) => {
   }
 
   return transformedObject
+}
+
+/**
+ * Runs a second extraction pass for nested components support.
+ *
+ * To avoid component nesting problem (e.g. ".card" inside another component
+ * -> potential multiple matches from root to deepest nesting levels), we needed
+ * a way to start by extracting the deepest levels first and mark the components
+ * as extracted.
+ *
+ * This makes use of a property on the page worker instance itself which stores
+ * all 'components' fields placeholder objects (which are built recursively from
+ * config) in order to handle the processing in the correct order during this
+ * second "pass".
+ *
+ * Nesting depth detection uses extractors' ancestors count, and in case of
+ * equality, we compare CSS selectors specificity - after custom jQuery-like
+ * syntax was converted by preprocessExtractor().
+ *
+ * See https://github.com/keeganstreet/specificity
+ */
+const runSecondPass = async (o) => {
+  const { extracted, pageWorker, main } = o
+
+  // Debug.
+  console.log('')
+  console.log('second pass - pageWorker.extractionPlaceholders')
+  console.log(pageWorker.extractionPlaceholders.map(p => p.context.extractor.ancestorsChain))
+
+  // Nothing to do if no components fields were set in config.
+  if (!pageWorker.extractionPlaceholders.length) {
+    return
+  }
+
+  // No need to compare anything if there's only a single components field.
+  if (pageWorker.extractionPlaceholders.length === 1) {
+    const extractionPlaceholder = pageWorker.extractionPlaceholders.pop()
+    await componentsFieldProcess(extractionPlaceholder.context)
+
+    // debug
+    extractionPlaceholder.placeholder.test_field = 'test value'
+
+    return
+  }
+
+  // Sort placeholders by most deeply nested then CSS selectors specificity.
+  pageWorker.extractionPlaceholders.sort((a, b) => {
+    // 'a' is less specific than 'b' (= less deeply nested).
+    if (a.context.extractor.depth < b.context.extractor.depth) {
+      return -1
+    }
+    // 'a' is more specific than 'b' (= nested deeper).
+    if (a.context.extractor.depth > b.context.extractor.depth) {
+      return 1
+    }
+    // Equality leads to CSS selectors specificity comparison.
+    if (a.context.extractor.depth === b.context.extractor.depth) {
+      return compare(a.context.extractor.selector, b.context.extractor.selector)
+    }
+  })
+
+  // TODO (wip)
+  console.log('runSecondPass() - sorting result :')
+  console.log(pageWorker.extractionPlaceholders)
+  // console.log(extracted)
 }
 
 module.exports = {

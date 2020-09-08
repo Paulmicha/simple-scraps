@@ -40,7 +40,7 @@ const setting = (key) => {
     case 'minifyExtractedHtml':
       return true
     case 'maxExtractionNestingDepth':
-      return 3
+      return 9
   }
 }
 

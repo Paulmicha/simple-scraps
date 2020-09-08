@@ -411,6 +411,7 @@ class Main extends EventEmitter {
     // console.log(extractors)
 
     // Chain all extractors that need to run on given page to build our entity.
+    // TODO (opti.minor) check if this could run concurrently (Promise.all).
     for (let i = 0; i < extractors.length; i++) {
       const extractor = extractors[i]
       await extract.run({ extractor, extracted: entity, pageWorker, main: this })
