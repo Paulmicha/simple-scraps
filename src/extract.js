@@ -5,7 +5,7 @@
 
 const urlParse = require('url-parse')
 const minifyHtml = require('html-minifier-terser').minify
-const { compare } = require('specificity')
+const component = require('./component')
 
 /**
  * Extracts absolute URLs from links matched by given selector.
@@ -159,27 +159,15 @@ const match = (entityType, main) => {
 }
 
 /**
- * Determines what field or prop the given extractor will process.
- *
- * The extract 'as' syntax can support any of the following declarations :
- * - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
- * - <thing>.<type>.<prop> (ex: component.Lede.text)
- * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
- */
-const as = (extractor, onlyTail) => {
-  const parts = extractor.as.split('.')
-
-  if (onlyTail) {
-    return parts.pop()
-  }
-
-  return parts
-}
-
-/**
  * Runs a single extractor.
  *
  * This is called recursively to allow nested components extraction.
+ *
+ * The field or prop the given extractor will process is determined by the 'as'
+ * config key. Examples :
+ * - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
+ * - <thing>.<type>.<prop> (ex: component.Lede.text)
+ * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
  */
 const run = async (o) => {
   const { extractor, extracted, pageWorker, main, fieldOverride } = o
@@ -193,17 +181,9 @@ const run = async (o) => {
     return
   }
 
-  // Debug.
-  // console.log(Object.keys(o))
-  // console.log(extractor)
-  // console.log(
-  //   `run() - extract '${extractor.selector}' as ${as(extractor).join(':')}`
-  // )
-
   // By default, the field (or property) that is being extracted is the 2nd part
   // of the "as" key, but it needs to be overridable for nested components.
-  // @see as()
-  const destination = as(extractor)
+  const destination = extractor.as.split('.')
   let field = fieldOverride
   if (!field) {
     field = destination[1]
@@ -303,6 +283,7 @@ const run = async (o) => {
  * @returns {boolean} carry on or stops the recursive extraction process.
  */
 const preprocessExtractor = (o) => {
+  // const { extractor, pageWorker, main, parentExtractor } = o
   const { extractor, main, parentExtractor } = o
 
   // Assign an "ancestor chain" string to the extractor. It will we used for
@@ -338,9 +319,22 @@ const preprocessExtractor = (o) => {
 
   // Impose a depth limit, otherwise there would be inevitable infinite loops
   // when components include other components.
+  // TODO this does not prevent memory leaks when trying to extract instances of
+  // a component inside itself. See above.
   if (extractor.depth > main.getSetting('maxExtractionNestingDepth')) {
     return false
   }
+
+  // TODO (archive) memory leak tracking failed attempt.
+  // if (extractor.ancestorsChain.length) {
+  //   console.log(`  check ${extractor.ancestorsChain} in pageWorker.componentsExtracted ...`)
+  //   if (pageWorker.componentsExtracted.includes(extractor.ancestorsChain)) {
+  //     // Debug.
+  //     console.log(`  abort due to already processed ${extractor.ancestorsChain}`)
+  //     return false
+  //   }
+  //   pageWorker.componentsExtracted.push(extractor.ancestorsChain)
+  // }
 
   // Call any custom 'preprocess' implementations.
   if ('preprocess' in extractor) {
@@ -432,12 +426,12 @@ const subItemsFieldProcess = async (o) => {
     const componentExtractor = extractor.extract.shift()
     // componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
 
-    const multiFieldItemProp = as(componentExtractor, true)
+    const multiFieldItemProp = extractor.as.split('.').pop()
 
     // Delimiters use "markers" that are directly set on the DOM element defined
     // as scope for every single child item. They are data-attributes containing
     // a counter.
-    const destination = as(componentExtractor)
+    const destination = componentExtractor.as.split('.')
 
     // TODO (wip) this will be implemented when we write tests.
     // const destArrCursors = []
@@ -549,283 +543,34 @@ const elementFieldProcess = async (o) => {
  *  "as": "component.MediaGrid"
  */
 const componentsFieldProcess = async (o) => {
-  const { extractor, extracted, pageWorker, main, field } = o
+  const { extracted, field } = o
 
   // Debug.
-  console.log('componentsFieldProcess()')
-
-  // Prevent infinite loops during nested components lookup.
-  // @see preprocessExtractor()
-  if (extractor.ancestorsChain.length) {
-    if (pageWorker.componentsExtracted.includes(extractor.ancestorsChain)) {
-      // Debug.
-      console.log(`  abort due to already processed ${extractor.ancestorsChain}`)
-      return
-    }
-    pageWorker.componentsExtracted.push(extractor.ancestorsChain)
-  }
-
-  // if (extractor.stopRecursiveLookup) {
-  //   return
-  // }
-  // Prevent infinite loops by checking this extractor hasn't run already in
-  // given scope.
-  // if (extractor.ancestors && extractor.ancestors.includes(parentExtractor)) {
-  //   extractor.stopRecursiveLookup = true
-  //   return
-  // }
-
-  // TODO evaluate wildcards for doing things like :
-  //  "extract": "components.nested"
-  // which could contain e.g. only selector overrides based on the "base"
-  // extractors (components).
-  if (!('components' in main.config)) {
-    throw Error('Missing components definition for selector : ' + extractor.selector)
-  }
+  console.log(`componentsFieldProcess() : ${o.extractor.as}`)
 
   const components = []
+  const contexts = component.getExtractionContexts(o)
 
-  for (let i = 0; i < main.config.components.length; i++) {
-    // const componentExtractor = main.config.components[i]
-    const componentExtractor = { ...main.config.components[i] }
-    const component = {}
-    const [thing, type, prop] = as(componentExtractor)
+  for (let i = 0; i < contexts.length; i++) {
+    const c = {}
+    const context = contexts[i]
+    context.extracted = c
 
     // Debug.
-    console.log(componentExtractor.as)
+    console.log(`  Will run extraction context : ${context.extractor.as} (type:${context.type}, props:${context.props})`)
 
-    // For components having a single prop to extract, e.g. :
-    //  "as": "component.Lede.text"
-    // we can handle these in a single run.
-    // Otherwise, the "extract" key contains an array of sub-extractors which
-    // must all run on the same component object.
-    if (!Array.isArray(componentExtractor.extract)) {
-      // Debug.
-      console.log('  Single extractor component definition')
+    await run(context)
 
-      await run({
-        extractor: componentExtractor,
-        parentExtractor: extractor,
-        extracted: component,
-        pageWorker,
-        main,
-        fieldOverride: prop
-      })
-      components.push(componentEntityToObject(component, type, prop))
-    } else {
-      // We need to regroup sub-extractors to differenciate fields containing
-      // multiple values (each value requiring its own extractor run) from
-      // simpler ones (that can be dealt with in a single run).
-      const regroupedExtractors = {}
-
-      // while (componentExtractor.extract.length) {
-      //   const subExtractor = componentExtractor.extract.shift()
-      for (let j = 0; j < componentExtractor.extract.length; j++) {
-        const subExtractor = componentExtractor.extract[j]
-        const destination = as(subExtractor)
-        let groupBy = destination[2]
-
-        if (destination[2].indexOf('[]') !== false) {
-          groupBy = destination[2].replace('[]', '')
-        }
-        if (!(groupBy in regroupedExtractors)) {
-          regroupedExtractors[groupBy] = []
-        }
-
-        regroupedExtractors[groupBy].push(subExtractor)
-      }
-
-      // For example, at this stage, we would have something like :
-      //  regroupedExtractors = {
-      //    items: [
-      //      { as : 'component.MediaGrid.items[].image', ... <rest of extractor definition> },
-      //      { as : 'component.MediaGrid.items[].title', ... <rest of extractor definition> },
-      //      { as : 'component.MediaGrid.items[].text', ... <rest of extractor definition> }
-      //    ],
-      //    variant: [
-      //      { as : 'component.MediaGrid.variant', ... <rest of extractor definition> }
-      //    ]
-      //  }
-      //
-      // So now, we need to generate 1 extractor definition per prop to match
-      // what is expected in the run() function :
-      //
-      //  -> For multi-props sub items :
-      //  subExtractorForItemsProp = {
-      //    selector: <Here we use the CSS selector of the scope delimiter
-      //      from the grouped extractors of the sub-item if available, else
-      //      we take the one from the component which then acts as the
-      //      fallback scope>,
-      //    extract: [
-      //      { as : 'component.MediaGrid.items[].image', ... <rest of extractor definition> },
-      //      { as : 'component.MediaGrid.items[].title', ... <rest of extractor definition> },
-      //      { as : 'component.MediaGrid.items[].text', ... <rest of extractor definition> }
-      //    ],
-      //    as: 'component.MediaGrid.items'
-      //  }
-      //
-      //  -> For single props :
-      //  subExtractorForVariantProp = {
-      //    selector: <use the value from 'variant' prop extractor definition>,
-      //    extract: <use the value from 'variant' prop extractor definition>,
-      //    as : 'component.MediaGrid.variant',
-      //    ... <any other keys from 'variant' prop extractor definition, e.g. 'emit'>
-      //  }
-      const fields = Object.keys(regroupedExtractors)
-
-      // Debug.
-      console.log('  Multiple extractors component definition')
-      console.log('    component fields :')
-      console.log(fields)
-
-      for (let i = 0; i < fields.length; i++) {
-        const field = fields[i]
-
-        // Debug.
-        console.log('    subExtractors :')
-        console.log(regroupedExtractors[field].map(e => e.as))
-
-        const subExtractors = regroupedExtractors[field]
-        let newExtractor = { as: `${thing}.${type}.${field}` }
-
-        // Simple props have a single extractor which can be used "as is".
-        // Multi-field sub-items need 1 'extract' array item per field.
-        if (subExtractors.length === 1) {
-          newExtractor = subExtractors.pop()
-        } else {
-          // Selector fallback : use the component's extractor value. Then look
-          // for a 'delimiter' key in child extractors if available.
-          newExtractor.selector = componentExtractor.selector
-          subExtractors.forEach(ex => {
-            if ('delimiter' in ex) {
-              newExtractor.selector = ex.delimiter
-            }
-          })
-          newExtractor.extract = subExtractors
-        }
-
-        // Debug.
-        // console.log('newExtractor :')
-        // console.log(newExtractor)
-
-        await run({
-          extractor: newExtractor,
-          parentExtractor: extractor,
-          extracted: component,
-          pageWorker,
-          main,
-          fieldOverride: field
-        })
-      }
-
-      // Debug.
-      console.log('component :')
-      console.log(component)
-
-      if (Object.keys(component).length !== 0) {
-        components.push(componentEntityToObject(component, type, fields))
-      }
+    if (Object.keys(c).length !== 0) {
+      components.push(component.transformObject(c, context.type, context.props))
     }
   }
 
   extracted[field] = components
 }
 
-/**
- * Transforms components extration result to match expected structure.
- *
- * Example extraction result (input) :
- *  { Lede: "<p>markup contents</p>" }
- * Expected structure (output) :
- *  { c: "Lede", props: { text: "<p>markup contents</p>" }}
- */
-const componentEntityToObject = (componentEntity, type, prop) => {
-  const transformedObject = {}
-  transformedObject.c = type
-  transformedObject.props = {}
-
-  if (Array.isArray(prop)) {
-    prop.forEach(p => {
-      transformedObject.props[p] = componentEntity[p]
-    })
-  } else {
-    transformedObject.props[prop] = componentEntity[prop]
-  }
-
-  return transformedObject
-}
-
-/**
- * Runs a second extraction pass for nested components support.
- *
- * To avoid component nesting problem (e.g. ".card" inside another component
- * -> potential multiple matches from root to deepest nesting levels), we needed
- * a way to start by extracting the deepest levels first and mark the components
- * as extracted.
- *
- * This makes use of a property on the page worker instance itself which stores
- * all 'components' fields placeholder objects (which are built recursively from
- * config) in order to handle the processing in the correct order during this
- * second "pass".
- *
- * Nesting depth detection uses extractors' ancestors count, and in case of
- * equality, we compare CSS selectors specificity - after custom jQuery-like
- * syntax was converted by preprocessExtractor().
- *
- * See https://github.com/keeganstreet/specificity
- */
-const runSecondPass = async (o) => {
-  const { extracted, pageWorker, main } = o
-
-  // Debug.
-  console.log('')
-  console.log('second pass - pageWorker.extractionPlaceholders')
-  console.log(pageWorker.extractionPlaceholders.map(p => p.context.extractor.ancestorsChain))
-
-  // Nothing to do if no components fields were set in config.
-  if (!pageWorker.extractionPlaceholders.length) {
-    return
-  }
-
-  // No need to compare anything if there's only a single components field.
-  if (pageWorker.extractionPlaceholders.length === 1) {
-    const extractionPlaceholder = pageWorker.extractionPlaceholders.pop()
-    await componentsFieldProcess(extractionPlaceholder.context)
-
-    // debug
-    extractionPlaceholder.placeholder.test_field = 'test value'
-
-    return
-  }
-
-  // Sort placeholders by most deeply nested then CSS selectors specificity.
-  pageWorker.extractionPlaceholders.sort((a, b) => {
-    // 'a' is less specific than 'b' (= less deeply nested).
-    if (a.context.extractor.depth < b.context.extractor.depth) {
-      return -1
-    }
-    // 'a' is more specific than 'b' (= nested deeper).
-    if (a.context.extractor.depth > b.context.extractor.depth) {
-      return 1
-    }
-    // Equality leads to CSS selectors specificity comparison.
-    if (a.context.extractor.depth === b.context.extractor.depth) {
-      return compare(a.context.extractor.selector, b.context.extractor.selector)
-    }
-  })
-
-  // TODO (wip)
-  console.log('runSecondPass() - sorting result :')
-  console.log(pageWorker.extractionPlaceholders)
-  // console.log(extracted)
-}
-
 module.exports = {
   linksUrl,
-  element,
-  markup,
-  text,
   match,
-  run,
-  runSecondPass
+  run
 }
