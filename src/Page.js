@@ -12,9 +12,15 @@ class Page {
   constructor (main) {
     this.main = main
 
-    // TODO (wip) other refactor in progress.
-    this.componentsExtracted = []
+    // There's a common store we need to avoid prepending several times the same
+    // CSS selector prefix for scoping nested components.
+    // @see getExtractionContexts() in src/component.js
+    this.componentScopeProcessed = []
 
+    // TODO below is now obsolete, to remove when confirmed.
+    // TODO (wip) other refactor in progress.
+    // @see preprocessExtractor()
+    // this.componentsExtracted = []
     // To avoid component nesting problem (.c-card inside another component
     // -> potential multiple matches from root to deepest nesting levels), we
     // need a way to start extracting deepest levels + mark the component as
@@ -24,7 +30,7 @@ class Page {
     // This property on the Page object itself will store all "components" field
     // scope (which are built recursively from config) in order to process them
     // them during a second "pass".
-    // @see runSecondPass() in src/extract.js
+    // @see runSecondPass()
     // this.extractionPlaceholders = []
   }
 

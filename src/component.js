@@ -132,6 +132,19 @@ const getExtractionContexts = (o) => {
         // Multi-field sub-items need 1 'extract' array item per field.
         if (subExtractors.length === 1) {
           newExtractor = subExtractors.pop()
+
+          // Avoid prepending several times the same CSS selector prefix for
+          // scoping nested components.
+          const scopedSelector = componentExtractor.selector + ' ' + newExtractor.selector
+
+          if (!pageWorker.componentScopeProcessed.includes(newExtractor.selector)) {
+            // Debug.
+            console.log(`      Prepend component selector to ${newExtractor.selector}`)
+            console.log(`        result : ${scopedSelector}`)
+
+            newExtractor.selector = scopedSelector
+            pageWorker.componentScopeProcessed.push(newExtractor.selector)
+          }
         } else {
           // Selector fallback : use the component's extractor value. Then look
           // for a 'delimiter' key in child extractors if available.

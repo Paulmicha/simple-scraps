@@ -69,7 +69,7 @@ const text = async (page, selector, removeBreaks) => {
  * many matches are found. If multiple elements match, the extracted string will
  * join them using given separator (defaults to a space in scraper settings).
  */
-const textSingle = async (page, selector, separator, removeBreaks) => {
+const textSingle = async (page, selector, removeBreaks, separator) => {
   const matches = await text(page, selector, removeBreaks)
   if (Array.isArray(matches)) {
     return matches.join(separator)
@@ -189,6 +189,12 @@ const run = async (o) => {
     field = destination[1]
   }
 
+  // Debug.
+  // if (extractor.depth >= 3) {
+  console.log(`Extracting ${field} for ${extractor.as}`)
+  console.log(`  ${extractor.selector}`)
+  // }
+
   // Support fields containing multiple items with props.
   if (Array.isArray(extractor.extract)) {
     await subItemsFieldProcess({ extractor, extracted, pageWorker, main, field })
@@ -208,8 +214,8 @@ const run = async (o) => {
       extracted[field] = await textSingle(
         pageWorker.page,
         extractor.selector,
-        main.getSetting('plainTextSeparator'),
-        main.getSetting('plainTextRemoveBreaks')
+        main.getSetting('plainTextRemoveBreaks'),
+        main.getSetting('plainTextSeparator')
       )
       break
     case 'markup':
@@ -560,19 +566,18 @@ const componentsFieldProcess = async (o) => {
     await run(context)
 
     // Debug.
-    console.log(`Look for ${o.extractor.as} / ${context.extractor.as} (depth : ${context.extractor.depth})`)
+    // console.log(`Look for ${o.extractor.as} / ${context.extractor.as} (depth : ${context.extractor.depth})`)
     // console.log(`  parents : ${context.extractor.ancestorsChain}`)
 
-    // TODO why empty object has Object.keys(c).length of 1 ???
+    // TODO why empty object has Object.keys(c).length of 1 ?
     // if (Object.keys(c).length !== 0) {
     if (JSON.stringify(c) !== '{}') {
       // Debug.
-      console.log(`  result : ${JSON.stringify(c)} (${Object.keys(c).length})`)
-
+      // console.log(`  result : ${JSON.stringify(c)} (${Object.keys(c).length})`)
       components.push(component.transformObject(c, context.type, context.props))
-    } else {
-      // Debug.
-      console.log('  nothing matched.')
+      // } else {
+      //   // Debug.
+      //   console.log('  nothing matched.')
     }
   }
 
