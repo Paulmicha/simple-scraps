@@ -297,16 +297,6 @@ const preprocessExtractor = (o) => {
     ancestors = getExtractorAncestors(extractor)
     ancestorsChain = ancestors.map(e => e.as).join(' <- ') + ' <- '
 
-    // TODO find out why the fact of looking for a component instance inside
-    // itself leads to memory leak, despite the limit on maximum depth.
-    if (ancestorsChain.includes(` <- ${extractor.as} <- `)) {
-      // Debug.
-      // console.log('')
-      // console.log(`  Forbid to look for instances of a component inside itself (${extractor.as} in '${ancestorsChain}')`)
-      // console.log('')
-      return false
-    }
-
     // Also assign a scope for current extractor, and prepend selector for
     // ensuring correct nesting during recusrive calls.
     extractor.scope = parentExtractor.selector
@@ -320,11 +310,19 @@ const preprocessExtractor = (o) => {
   // Impose a depth limit, otherwise there would be inevitable infinite loops
   // when components include other components.
   // TODO this does not prevent memory leaks when trying to extract instances of
-  // a component inside itself. See above.
+  // a component inside itself. See below.
   if (extractor.depth > main.getSetting('maxExtractionNestingDepth')) {
     return false
   }
-
+  // TODO find out why the fact of looking for a component instance inside
+  // itself leads to memory leak, despite the limit on maximum depth. See above.
+  if (ancestorsChain.includes(` <- ${extractor.as} <- `)) {
+    // Debug.
+    // console.log('')
+    // console.log(`  Forbid to look for instances of a component inside itself (${extractor.as} in '${ancestorsChain}')`)
+    // console.log('')
+    return false
+  }
   // TODO (archive) memory leak tracking failed attempt.
   // if (extractor.ancestorsChain.length) {
   //   console.log(`  check ${extractor.ancestorsChain} in pageWorker.componentsExtracted ...`)
@@ -342,9 +340,9 @@ const preprocessExtractor = (o) => {
   }
 
   // Debug.
-  const debugIndent = '  '.repeat(extractor.depth)
-  console.log(`${debugIndent}depth ${extractor.depth} : ${extractor.ancestorsChain}`)
-  console.log(`${debugIndent}  ( ${extractor.selector} )`)
+  // const debugIndent = '  '.repeat(extractor.depth)
+  // console.log(`${debugIndent}depth ${extractor.depth} : ${extractor.ancestorsChain}`)
+  // console.log(`${debugIndent}  ( ${extractor.selector} )`)
 
   // TODO [wip] next iteration :
   // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
@@ -546,7 +544,7 @@ const componentsFieldProcess = async (o) => {
   const { extracted, field } = o
 
   // Debug.
-  console.log(`componentsFieldProcess() : ${o.extractor.as}`)
+  // console.log(`componentsFieldProcess() : ${o.extractor.as}`)
 
   const components = []
   const contexts = component.getExtractionContexts(o)
@@ -557,12 +555,24 @@ const componentsFieldProcess = async (o) => {
     context.extracted = c
 
     // Debug.
-    console.log(`  Will run extraction context : ${context.extractor.as} (type:${context.type}, props:${context.props})`)
+    // console.log(`  Will run extraction context : ${context.extractor.as} (type:${context.type}, props:${context.props})`)
 
     await run(context)
 
-    if (Object.keys(c).length !== 0) {
+    // Debug.
+    console.log(`Look for ${o.extractor.as} / ${context.extractor.as} (depth : ${context.extractor.depth})`)
+    // console.log(`  parents : ${context.extractor.ancestorsChain}`)
+
+    // TODO why empty object has Object.keys(c).length of 1 ???
+    // if (Object.keys(c).length !== 0) {
+    if (JSON.stringify(c) !== '{}') {
+      // Debug.
+      console.log(`  result : ${JSON.stringify(c)} (${Object.keys(c).length})`)
+
       components.push(component.transformObject(c, context.type, context.props))
+    } else {
+      // Debug.
+      console.log('  nothing matched.')
     }
   }
 
