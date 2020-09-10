@@ -15,7 +15,7 @@ const getExtractionContexts = (o) => {
   const contexts = []
 
   // Debug.
-  // console.log(`getExtractionContexts() : ${extractor.as}`)
+  console.log(`  getExtractionContexts() : ${extractor.as}`)
 
   // TODO evaluate wildcards for doing things like :
   //  "extract": "components.nested"
@@ -33,6 +33,7 @@ const getExtractionContexts = (o) => {
 
     // Debug.
     // console.log(componentExtractor.as)
+    console.log(`    ${componentExtractor.as}`)
 
     // For components having a single prop to extract, e.g. :
     //  "as": "component.Lede.text"
@@ -112,6 +113,7 @@ const getExtractionContexts = (o) => {
       //    ... <any other keys from 'variant' prop extractor definition, e.g. 'emit'>
       //  }
       const fields = Object.keys(regroupedExtractors)
+      // const fieldsExtractors = []
 
       // Debug.
       // console.log('  Multiple extractors component definition')
@@ -126,44 +128,96 @@ const getExtractionContexts = (o) => {
         // console.log(regroupedExtractors[field].map(e => e.as))
 
         const subExtractors = regroupedExtractors[field]
-        let newExtractor = { as: `${thing}.${type}.${field}` }
+
+        let newExtractor = {}
+        newExtractor.extract = subExtractors
+        newExtractor.as = `${thing}.${type}.${field}`
+        newExtractor.selector = componentExtractor.selector
+
+        // Debug.
+        console.log(`      ${thing}.${type}.${field}`)
+        // console.log('    newExtractor.as :')
+        // console.log(`      ${newExtractor.as}`)
+        // console.log('    subExtractors :')
+        // console.log(`      ${subExtractors.map(e => e.as).join(', ')}`)
 
         // Simple props have a single extractor which can be used "as is".
         // Multi-field sub-items need 1 'extract' array item per field.
         if (subExtractors.length === 1) {
-          newExtractor = subExtractors.pop()
+          // newExtractor = subExtractors.pop()
+          // newExtractor.selector = `${componentExtractor.selector} ${newExtractor.selector}`
 
           // Avoid prepending several times the same CSS selector prefix for
           // scoping nested components.
-          const scopedSelector = componentExtractor.selector + ' ' + newExtractor.selector
+          // const scopedSelector = componentExtractor.selector + ' ' + newExtractor.selector
 
-          if (!pageWorker.componentScopeProcessed.includes(newExtractor.selector)) {
-            // Debug.
-            console.log(`      Prepend component selector to ${newExtractor.selector}`)
-            console.log(`        result : ${scopedSelector}`)
+          // if (!pageWorker.componentScopeProcessed.includes(newExtractor.selector)) {
+          //   // Debug.
+          //   console.log(`      Prepend component selector to ${newExtractor.selector}`)
+          //   console.log(`        result : ${scopedSelector}`)
 
-            newExtractor.selector = scopedSelector
-            pageWorker.componentScopeProcessed.push(newExtractor.selector)
-          }
+          //   newExtractor.selector = scopedSelector
+          //   pageWorker.componentScopeProcessed.push(newExtractor.selector)
+          // }
+
+          // contexts.push({
+          //   extractor: subExtractors.pop(),
+          //   parentExtractor: componentExtractor,
+          //   pageWorker,
+          //   main,
+          //   fieldOverride: field,
+          //   type,
+          //   props: field
+          // })
         } else {
           // Selector fallback : use the component's extractor value. Then look
           // for a 'delimiter' key in child extractors if available.
-          newExtractor.selector = componentExtractor.selector
-          subExtractors.forEach(ex => {
-            if ('delimiter' in ex) {
-              newExtractor.selector = ex.delimiter
-            }
-          })
-          newExtractor.extract = subExtractors
+          // TODO (wip) rework this.
+          // newExtractor.selector = componentExtractor.selector
+
+          /* subExtractors.forEach(ex => {
+            // if ('delimiter' in ex) {
+            //   newExtractor.selector = ex.delimiter
+            // }
+
+            // Avoid prepending several times the same CSS selector prefix for
+            // scoping nested components.
+            // const scopedSelector = componentExtractor.selector + ' ' + ex.selector
+            // if (!pageWorker.componentScopeProcessed.includes(ex.selector)) {
+            //   // Debug.
+            //   console.log(`      Prepend component selector to ${ex.selector}`)
+            //   console.log(`        result : ${scopedSelector}`)
+
+            //   ex.selector = scopedSelector
+            //   pageWorker.componentScopeProcessed.push(newExtractor.selector)
+            // }
+
+            // contexts.push({
+            //   extractor: ex,
+            //   parentExtractor: componentExtractor,
+            //   pageWorker,
+            //   main,
+            //   fieldOverride: field,
+            //   type,
+            //   props: field
+            // })
+          }) */
+
+          // newExtractor.extract = subExtractors
         }
 
         // Debug.
         // console.log('newExtractor :')
         // console.log(newExtractor)
+        // console.log('      newExtractor.extract :')
+        // console.log(`        ${newExtractor.extract}`)
+
+        // fieldsExtractors.push(newExtractor)
 
         contexts.push({
           extractor: newExtractor,
           parentExtractor: extractor,
+          // parentExtractor: componentExtractor,
           pageWorker,
           main,
           fieldOverride: field,
@@ -171,6 +225,20 @@ const getExtractionContexts = (o) => {
           props: fields
         })
       }
+
+      // contexts.push({
+      //   extractor: {
+      //     as: componentExtractor.as,
+      //     selector: componentExtractor.selector,
+      //     extract: fieldsExtractors
+      //   },
+      //   parentExtractor: extractor,
+      //   pageWorker,
+      //   main,
+      //   fieldOverride: prop,
+      //   type,
+      //   props: fields
+      // })
     }
   }
 

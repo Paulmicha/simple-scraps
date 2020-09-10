@@ -170,7 +170,8 @@ const match = (entityType, main) => {
  * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
  */
 const run = async (o) => {
-  const { extractor, extracted, pageWorker, main, fieldOverride } = o
+  // const { extractor, extracted, pageWorker, main, fieldOverride } = o
+  const { extractor, extracted, pageWorker, main, fieldOverride, debugIndent } = o
 
   // Preprocess selectors to handle scope in recusrive calls and customizations.
   // Also imposes a depth limit for nested extraction process to avoid infinite
@@ -191,8 +192,8 @@ const run = async (o) => {
 
   // Debug.
   // if (extractor.depth >= 3) {
-  console.log(`Extracting ${field} for ${extractor.as}`)
-  console.log(`  ${extractor.selector}`)
+  console.log(`${debugIndent || ''}run() ${field} for ${extractor.as}`)
+  console.log(`${debugIndent || ''}  ${extractor.selector}`)
   // }
 
   // Support fields containing multiple items with props.
@@ -200,6 +201,9 @@ const run = async (o) => {
     await subItemsFieldProcess({ extractor, extracted, pageWorker, main, field })
     return
   }
+
+  // Debug.
+  console.log(`${debugIndent || ''}  extracting ${extractor.extract}`)
 
   // "Normal" process : extractor.extract is a string.
   switch (extractor.extract) {
@@ -305,8 +309,12 @@ const preprocessExtractor = (o) => {
 
     // Also assign a scope for current extractor, and prepend selector for
     // ensuring correct nesting during recusrive calls.
+    // if (!('scope' in extractor)) {
+    // console.log('-- there was already a scope on this extractor :')
+    // console.log('  ' + extractor.scope)
     extractor.scope = parentExtractor.selector
     extractor.selector = `${parentExtractor.selector} ${extractor.selector}`
+    // }
   }
 
   extractor.depth = ancestors.length
@@ -424,18 +432,18 @@ const subItemsFieldProcess = async (o) => {
   // console.log(extractor.extract)
 
   const subItem = {}
-  const subItemDelimiters = []
+  // const subItemDelimiters = []
 
   while (extractor.extract.length) {
     const componentExtractor = extractor.extract.shift()
     // componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
 
-    const multiFieldItemProp = extractor.as.split('.').pop()
+    const multiFieldItemProp = componentExtractor.as.split('.').pop()
 
     // Delimiters use "markers" that are directly set on the DOM element defined
     // as scope for every single child item. They are data-attributes containing
     // a counter.
-    const destination = componentExtractor.as.split('.')
+    // const destination = componentExtractor.as.split('.')
 
     // TODO (wip) this will be implemented when we write tests.
     // const destArrCursors = []
@@ -446,7 +454,9 @@ const subItemsFieldProcess = async (o) => {
     // })
 
     // Debug.
-    subItemDelimiters.push(destination.join('.'))
+    // subItemDelimiters.push(destination.join('.'))
+    console.log(`    subItemsFieldProcess() ${multiFieldItemProp} for ${componentExtractor.as}`)
+    // console.log(`      ${componentExtractor.selector}`)
 
     await run({
       extractor: componentExtractor,
@@ -454,7 +464,8 @@ const subItemsFieldProcess = async (o) => {
       extracted: subItem,
       pageWorker,
       main,
-      fieldOverride: multiFieldItemProp
+      fieldOverride: multiFieldItemProp,
+      debugIndent: '        '
     })
   }
 
@@ -462,8 +473,8 @@ const subItemsFieldProcess = async (o) => {
   // console.log(`  TODO (wip) implement delimiters for ${subItemDelimiters.join(', ')}`)
 
   // Debug.
-  // console.log('  subItem :')
-  // console.log(subItem)
+  console.log('  subItem :')
+  console.log(subItem)
 
   // At this point, the subItem object has the following structure :
   //  { <field_1>: 'value 1', <field_2>: ['value 2.1', 'value 2.2'] }
@@ -490,8 +501,8 @@ const subItemsFieldProcess = async (o) => {
   })
 
   // Debug.
-  // console.log('  subItems :')
-  // console.log(subItems)
+  console.log('  subItems :')
+  console.log(subItems)
 
   extracted[field] = subItems
 }
@@ -550,7 +561,7 @@ const componentsFieldProcess = async (o) => {
   const { extracted, field } = o
 
   // Debug.
-  // console.log(`componentsFieldProcess() : ${o.extractor.as}`)
+  console.log(`componentsFieldProcess() : ${o.extractor.as}`)
 
   const components = []
   const contexts = component.getExtractionContexts(o)
