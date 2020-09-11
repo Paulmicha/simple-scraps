@@ -465,8 +465,13 @@ const subItemsFieldProcess = async (o) => {
       pageWorker,
       main,
       fieldOverride: multiFieldItemProp,
-      debugIndent: '        '
+      debugIndent: '      '
     })
+  }
+
+  // Nothing to do when nothing matched.
+  if (JSON.stringify(subItem) === '{}') {
+    return
   }
 
   // Debug.
@@ -585,7 +590,10 @@ const componentsFieldProcess = async (o) => {
     if (JSON.stringify(c) !== '{}') {
       // Debug.
       // console.log(`  result : ${JSON.stringify(c)} (${Object.keys(c).length})`)
-      components.push(component.transformObject(c, context.type, context.props))
+
+      // components.push(component.transformObject(c, context.type, context.props))
+      components.push(c)
+
       // } else {
       //   // Debug.
       //   console.log('  nothing matched.')
