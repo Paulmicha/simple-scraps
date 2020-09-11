@@ -2,10 +2,11 @@ const EventEmitter = require('events')
 const puppeteer = require('puppeteer')
 const Page = require('./Page')
 const Queue = require('./Queue')
-const extract = require('./extract')
+const Extractor = require('./Extractor')
 const cache = require('./cache')
 const output = require('./output')
-const defaultConfig = require('./utils/default_config.js')
+const defaultConfig = require('./utils/default_config')
+const dom = require('./utils/dom')
 
 /**
  * Main "simple scraps" class.
@@ -314,7 +315,7 @@ class Main extends EventEmitter {
    * Applies limits if set.
    */
   async crawl (pageWorker, op) {
-    const urlsFound = await extract.linksUrl(pageWorker.page, op.selector)
+    const urlsFound = await dom.attribute(pageWorker.page, op.selector, 'href')
     if (!urlsFound || !urlsFound.length) {
       return
     }
@@ -389,40 +390,11 @@ class Main extends EventEmitter {
       throw Error('Missing extraction destination (to)')
     }
 
-    // Prepare the entity that will be extracted (each extractor deals with
-    // a part of the same entity).
-    const [entityType, bundle] = op.to.split('/')
-    const entity = {}
-
-    // Get all defined extractors that match current destination, unless
-    // directly specified in the op (for cases where a single URL is "hardcoded"
-    // in conf).
-    let extractors = []
-    if ('extract' in op) {
-      extractors = op.extract
-    } else {
-      extractors = extract.match(entityType, this)
-    }
-
-    // Debug.
-    // console.log('op')
-    // console.log(op)
-    // console.log('extractors')
-    // console.log(extractors)
-
-    // Chain all extractors that need to run on given page to build our entity.
-    // TODO (opti.minor) check if this could run concurrently (Promise.all).
-    for (let i = 0; i < extractors.length; i++) {
-      const extractor = extractors[i]
-      await extract.run({ extractor, extracted: entity, pageWorker, main: this })
-    }
-
-    // TODO (wip) other refactor evaluation.
-    // Runs the second pass to allow nested components extraction.
-    // await extract.runSecondPass({ extracted: entity, pageWorker, main: this })
+    const extractor = new Extractor(op, pageWorker, this)
+    const entity = extractor.run()
 
     // Allow alterations before saving.
-    this.emit('alter.extraction.result', entity, entityType, bundle, pageWorker)
+    this.emit('alter.extraction.result', entity, extractor)
 
     // Debug.
     // console.log(`Main - resulting entity object (${entityType}.${bundle}) :`)
@@ -430,7 +402,7 @@ class Main extends EventEmitter {
     // console.log(`Main - resulting entity object (${entityType}.${bundle}) *content[1].props* :`)
     // console.log(entity.content[1].props)
 
-    await output.saveExtractionResult(entity, entityType, bundle, pageWorker, this)
+    await output.saveExtractionResult(entity, extractor)
   }
 }
 

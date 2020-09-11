@@ -1,267 +1,165 @@
-/**
- * @file
- * Contains extraction implementations.
- */
-
-const urlParse = require('url-parse')
-const minifyHtml = require('html-minifier-terser').minify
-const component = require('./component')
+const dom = require('./utils/dom')
 
 /**
- * Extracts absolute URLs from links matched by given selector.
+ * Defines the process of extracting a structured object from a page.
+ *
+ * Loosely inspired by the design patterns Composite, Chain of Responsability,
+ * and Iterator.
+ *
+ * TODO (wip) reorganization in progress
  */
-const linksUrl = async (page, selector) => {
-  // Defaults to look for all <a href="..."> in the page.
-  if (!selector) {
-    selector = 'a[href]'
-  }
+class Extractor {
+  constructor (op, pageWorker, main) {
+    const [entityType, bundle] = op.to.split('/')
 
-  await page.waitForSelector(selector)
-  /* istanbul ignore next */
-  const urlsFound = await page.evaluate((selector) => {
-    // This function is running inside headless Chrome.
-    const extracts = []
-    const anchors = Array.from(document.querySelectorAll(selector))
-    anchors.map((anchor) => extracts.push(anchor.href))
-    return extracts
-  }, selector)
-
-  // Transforms non-absolute URLs into absolute URLS.
-  return urlsFound.map(urlFound => {
-    if (urlFound.substring(0, 4) !== 'http') {
-      const parsedOpUrl = urlParse(page.url())
-      return parsedOpUrl.host + urlFound
+    // Get all defined extraction config that match current destination, unless
+    // directly specified in the op (for cases where a single URL is "hardcoded"
+    // in conf).
+    let configs = []
+    if ('extract' in op) {
+      configs = op.extract
+    } else {
+      configs = this.mapConfig()
     }
-    return urlFound
-  })
-}
 
-/**
- * Extracts plain text string(s) matching given selector.
- *
- * If multiple elements match the selector, an Array will be returned, otherwise
- * a string.
- */
-const text = async (page, selector, removeBreaks) => {
-  /* istanbul ignore next */
-  const matches = await page.$$eval(selector, items => items.map(
-    item => item.textContent
-      // The first replace regex is used to remove indentation when HTML
-      // markup contains line breaks.
-      .replace(/^\s{2,}/gm, '')
-      // The second replace regex is used to trim the matched text.
-      .replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
-  ))
-
-  if (removeBreaks) {
-    return arrayOrItemIfSingle(
-      matches.map(string => string.replace(/[\r\n]+/gm, ' '))
-    )
+    this.configs = configs
+    this.result = {}
+    this.entityType = entityType
+    this.bundle = bundle
+    this.pageWorker = pageWorker
+    this.main = main
   }
 
-  return arrayOrItemIfSingle(matches)
-}
+  /**
+   * Maps extraction definitions to entity type.
+   */
+  mapConfig () {
+    let extractors = []
 
-/**
- * Extracts a single plain text string matching given selector.
- *
- * Unlike the plain text extractor, this always returns a string, no matter how
- * many matches are found. If multiple elements match, the extracted string will
- * join them using given separator (defaults to a space in scraper settings).
- */
-const textSingle = async (page, selector, removeBreaks, separator) => {
-  const matches = await text(page, selector, removeBreaks)
-  if (Array.isArray(matches)) {
-    return matches.join(separator)
-  }
-  return matches
-}
-
-/**
- * Extracts inner HTML matching given selector.
- *
- * If multiple elements match the selector, an Array will be returned, otherwise
- * a string.
- */
-const markup = async (page, selector, minify) => {
-  if (minify) {
-    /* istanbul ignore next */
-    const matches = await page.$$eval(selector, items => items.map(
-      // The replace regex is used to trim the matched markup.
-      item => item.innerHTML.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
-    ))
-    return arrayOrItemIfSingle(
-      matches.map(
-        html => minifyHtml(html, {
-          collapseWhitespace: true,
-          // For now, when requested minified, extracted HTML markup is assumed
-          // not to preserve inline display impacts of whitespace removal.
-          // See http://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace
-          // conservativeCollapse: true,
-          trimCustomFragments: true,
-          keepClosingSlash: true
-        })
-      )
-    )
-  }
-  /* istanbul ignore next */
-  return arrayOrItemIfSingle(
-    await page.$$eval(selector, items => items.map(
-      // The replace regex is used to trim the matched markup.
-      item => item.innerHTML.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
-    ))
-  )
-}
-
-/**
- * Extracts DOM elements matching given selector and return the result of
- * given callback.
- *
- * See https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pageevalselector-pagefunction-args
- *
- * If multiple elements match the selector, an Array will be returned, otherwise
- * a string.
- */
-const element = async (page, selector, callback) => {
-  /* istanbul ignore next */
-  return arrayOrItemIfSingle(await page.$$eval(selector, callback))
-}
-
-/**
- * Returns the first item of an array if it contains only one item, otherwise
- * returns the array.
- */
-const arrayOrItemIfSingle = (result) => {
-  if (!result || !result.length) {
-    return
-  }
-  if (result.length === 1) {
-    return result.pop()
-  }
-  return result
-}
-
-/**
- * Returns the extrators matching given entity type.
- */
-const match = (entityType, main) => {
-  let extractors = []
-
-  Object.keys(main.config)
-    .filter(key => key !== 'start')
-    .map(key => key.split('/'))
-    .filter(keyParts => keyParts[0] === entityType)
-    .map(keyParts => {
-      extractors = extractors.concat(main.config[keyParts.join('/')])
-    })
-
-  return extractors
-}
-
-/**
- * Runs a single extractor.
- *
- * This is called recursively to allow nested components extraction.
- *
- * The field or prop the given extractor will process is determined by the 'as'
- * config key. Examples :
- * - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
- * - <thing>.<type>.<prop> (ex: component.Lede.text)
- * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
- */
-const run = async (o) => {
-  // const { extractor, extracted, pageWorker, main, fieldOverride } = o
-  const { extractor, extracted, pageWorker, main, fieldOverride, debugIndent } = o
-
-  // Preprocess selectors to handle scope in recusrive calls and customizations.
-  // Also imposes a depth limit for nested extraction process to avoid infinite
-  // recursions for components including components.
-  // @see preprocessExtractor()
-  const carryOn = preprocessExtractor(o)
-  if (!carryOn) {
-    return
-  }
-
-  // By default, the field (or property) that is being extracted is the 2nd part
-  // of the "as" key, but it needs to be overridable for nested components.
-  const destination = extractor.as.split('.')
-  let field = fieldOverride
-  if (!field) {
-    field = destination[1]
-  }
-
-  // Debug.
-  // if (extractor.depth >= 3) {
-  console.log(`${debugIndent || ''}run() ${field} for ${extractor.as}`)
-  console.log(`${debugIndent || ''}  ${extractor.selector}`)
-  // }
-
-  // Support fields containing multiple items with props.
-  if (Array.isArray(extractor.extract)) {
-    await subItemsFieldProcess({ extractor, extracted, pageWorker, main, field })
-    return
-  }
-
-  // Debug.
-  console.log(`${debugIndent || ''}  extracting ${extractor.extract}`)
-
-  // "Normal" process : extractor.extract is a string.
-  switch (extractor.extract) {
-    case 'text':
-      extracted[field] = await text(
-        pageWorker.page,
-        extractor.selector,
-        main.getSetting('plainTextRemoveBreaks')
-      )
-      break
-    case 'text_single':
-      extracted[field] = await textSingle(
-        pageWorker.page,
-        extractor.selector,
-        main.getSetting('plainTextRemoveBreaks'),
-        main.getSetting('plainTextSeparator')
-      )
-      break
-    case 'markup':
-      extracted[field] = await markup(
-        pageWorker.page,
-        extractor.selector,
-        main.getSetting('minifyExtractedHtml')
-      )
-      break
-    // TODO implement an extraction for attribute(s).
-    case 'element':
-      await elementFieldProcess({ extractor, extracted, pageWorker, main, field })
-      break
-    // In order to support nested components extraction, we need to start from
-    // the "deepest" nesting levels to avoid matching the same elements multiple
-    // times. This is achieved by storing 'components' fields aside for later
-    // processing during a second extraction pass, where we'll be able to scope
-    // extraction and mark extracted components to avoid potential duplicates.
-    // @see runrunSecondPass()
-    case 'components': {
-      await componentsFieldProcess({ extractor, extracted, pageWorker, main, field })
-
-      // TODO other refactor in progress.
-      /*
-      // This placeholder sits in the exact place in the extracted object where
-      // components will be looked for and merged during the second pass.
-      const componentsFieldPlaceholder = {}
-      extracted[field] = componentsFieldPlaceholder
-
-      // Store references to placeholder objects in a single property directly
-      // on the page worker instance for easier processing later on.
-      // @see runSecondPass()
-      pageWorker.extractionPlaceholders.push({
-        placeholder: componentsFieldPlaceholder,
-        context: o
+    Object.keys(this.main.config)
+      .filter(key => key !== 'start')
+      .map(key => key.split('/'))
+      .filter(keyParts => keyParts[0] === this.entityType)
+      .map(keyParts => {
+        extractors = extractors.concat(this.main.config[keyParts.join('/')])
       })
 
-      // We still need to look ahead for "seeding" components nesting other
-      // components.
-      // TODO (wip)
-      */
-      break
+    return extractors
+  }
+
+  /**
+   * Returns the final resulting object.
+   */
+  async run () {
+    // TODO (wip)
+    return this.result
+  }
+
+  /**
+   * Processes an exctraction "cycle".
+   *
+   * This is called recursively to allow nested components extraction.
+   *
+   * The field or prop the given extractor will process is determined by the 'as'
+   * config key. Examples :
+   * - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
+   * - <thing>.<type>.<prop> (ex: component.Lede.text)
+   * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
+   */
+  async step (o) {
+    // const { extractor, extracted, pageWorker, main, fieldOverride } = o
+    const { extractor, extracted, pageWorker, main, fieldOverride, debugIndent } = o
+
+    // Preprocess selectors to handle scope in recusrive calls and customizations.
+    // Also imposes a depth limit for nested extraction process to avoid infinite
+    // recursions for components including components.
+    // @see preprocessExtractor()
+    const carryOn = preprocessExtractor(o)
+    if (!carryOn) {
+      return
+    }
+
+    // By default, the field (or property) that is being extracted is the 2nd part
+    // of the "as" key, but it needs to be overridable for nested components.
+    const destination = extractor.as.split('.')
+    let field = fieldOverride
+    if (!field) {
+      field = destination[1]
+    }
+
+    // Debug.
+    // if (extractor.depth >= 3) {
+    console.log(`${debugIndent || ''}run() ${field} for ${extractor.as}`)
+    console.log(`${debugIndent || ''}  ${extractor.selector}`)
+    // }
+
+    // Support fields containing multiple items with props.
+    if (Array.isArray(extractor.extract)) {
+      await subItemsFieldProcess({ extractor, extracted, pageWorker, main, field })
+      return
+    }
+
+    // Debug.
+    console.log(`${debugIndent || ''}  extracting ${extractor.extract}`)
+
+    // "Normal" process : extractor.extract is a string.
+    switch (extractor.extract) {
+      case 'text':
+        extracted[field] = await text(
+          pageWorker.page,
+          extractor.selector,
+          main.getSetting('plainTextRemoveBreaks')
+        )
+        break
+      case 'text_single':
+        extracted[field] = await textSingle(
+          pageWorker.page,
+          extractor.selector,
+          main.getSetting('plainTextRemoveBreaks'),
+          main.getSetting('plainTextSeparator')
+        )
+        break
+      case 'markup':
+        extracted[field] = await markup(
+          pageWorker.page,
+          extractor.selector,
+          main.getSetting('minifyExtractedHtml')
+        )
+        break
+      // TODO implement an extraction for attribute(s).
+      case 'element':
+        await elementFieldProcess({ extractor, extracted, pageWorker, main, field })
+        break
+      // In order to support nested components extraction, we need to start from
+      // the "deepest" nesting levels to avoid matching the same elements multiple
+      // times. This is achieved by storing 'components' fields aside for later
+      // processing during a second extraction pass, where we'll be able to scope
+      // extraction and mark extracted components to avoid potential duplicates.
+      // @see runrunSecondPass()
+      case 'components': {
+        await componentsFieldProcess({ extractor, extracted, pageWorker, main, field })
+
+        // TODO other refactor in progress.
+        /*
+        // This placeholder sits in the exact place in the extracted object where
+        // components will be looked for and merged during the second pass.
+        const componentsFieldPlaceholder = {}
+        extracted[field] = componentsFieldPlaceholder
+
+        // Store references to placeholder objects in a single property directly
+        // on the page worker instance for easier processing later on.
+        // @see runSecondPass()
+        pageWorker.extractionPlaceholders.push({
+          placeholder: componentsFieldPlaceholder,
+          context: o
+        })
+
+        // We still need to look ahead for "seeding" components nesting other
+        // components.
+        // TODO (wip)
+        */
+        break
+      }
     }
   }
 }
@@ -604,7 +502,5 @@ const componentsFieldProcess = async (o) => {
 }
 
 module.exports = {
-  linksUrl,
-  match,
-  run
+  Extractor
 }

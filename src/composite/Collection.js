@@ -3,9 +3,20 @@
  * Represents all objects extracted from a page DOM tree.
  */
 class Collection {
-  // TODO [wip]
-  // constructor () {
-  // }
+  constructor (iterator) {
+    this.items = []
+    this.iterator = iterator
+  }
+
+  cycle (callback) {
+    while (this.iterator.hasMore()) {
+      callback(this.iterator.next())
+    }
+  }
+
+  count () {
+    return this.items.length
+  }
 }
 
 module.exports = Collection

@@ -14,6 +14,10 @@ class Container extends Component {
   add (child) {
     this.children.push(child)
   }
+
+  getChildren () {
+    return this.children
+  }
 }
 
 module.exports = Container

@@ -13,23 +13,21 @@ const { entityToFilePath } = require('./utils/default_storage')
  * @emits store.extraction.result
  *
  * @param {object} entity object to store.
- * @param {Page} pageWorker instance.
- * @param {Main} main scraper instance to emit events in order to support
- *  pluggable storage process.
+ * @param {Extractor} extractor instance.
  * @return {boolean} Success flag.
  */
-const saveExtractionResult = async (entity, entityType, bundle, pageWorker, main) => {
-  const url = pageWorker.page.url()
+const saveExtractionResult = async (entity, extractor) => {
+  const url = extractor.pageWorker.page.url()
 
   // Make storage pluggable.
-  const hadListeners = main.emit('store.extraction.result', entity, entityType, bundle, url, pageWorker)
+  const hadListeners = extractor.main.emit('store.extraction.result', entity, extractor.entityType, extractor.bundle, url, extractor.pageWorker)
   if (hadListeners) {
     return
   }
 
   // Fallback to default storage if no provider was found.
-  const filePath = entityToFilePath('data/output', null, url, entityType, bundle)
-  if (main.getSetting('outputSkipExisiting') && fs.existsSync(filePath)) {
+  const filePath = entityToFilePath('data/output', null, url, extractor.entityType, extractor.bundle)
+  if (extractor.main.getSetting('outputSkipExisiting') && fs.existsSync(filePath)) {
     return
   }
 
