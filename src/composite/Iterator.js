@@ -4,24 +4,25 @@
  */
 class Iterator {
   constructor (collection) {
-    this.cursor = -1
+    this.cursor = 0
     this.collection = collection
   }
 
   next () {
     if (this.hasMore()) {
+      const item = this.collection.items[this.cursor]
       this.cursor++
-      return this.collection.items[this.cursor]
+      return item
     }
   }
 
   hasMore () {
     const count = this.collection.count()
-    return count > 0 && (this.cursor === -1 || count < this.cursor)
+    return count > 0 && this.cursor < count
   }
 
   reset () {
-    this.cursor = -1
+    this.cursor = 0
   }
 }
 

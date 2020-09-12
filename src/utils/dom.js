@@ -12,9 +12,6 @@ const minifyHtml = require('html-minifier-terser').minify
  * a string.
  */
 const text = async (page, selector, removeBreaks) => {
-  // Debug.
-  console.log('dom.text() - selector : ' + selector)
-
   /* istanbul ignore next */
   const matches = await page.$$eval(selector, items => items.map(
     item => item.textContent
@@ -24,10 +21,6 @@ const text = async (page, selector, removeBreaks) => {
       // The second replace regex is used to trim the matched text.
       .replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '')
   ))
-
-  // Debug.
-  console.log('matches')
-  console.log(matches)
 
   if (removeBreaks) {
     return arrayOrItemIfSingle(

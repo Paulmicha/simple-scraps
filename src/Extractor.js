@@ -1,6 +1,8 @@
 const dom = require('./utils/dom')
 const Collection = require('./composite/Collection')
 const Iterator = require('./composite/Iterator')
+const Container = require('./composite/Container')
+const Leaf = require('./composite/Leaf')
 
 /**
  * Defines the process of extracting a structured object from a page.
@@ -43,6 +45,10 @@ class Extractor {
     this.selectorsIterator = new Iterator(this.selectorsCollection)
     this.extractedCollection = new Collection()
     this.extractedIterator = new Iterator(this.extractedCollection)
+
+    // Finally, the composite tree has a single shared "root" : the HTML
+    // document itself (for Leaf instances extracted from <body>).
+    this.rootElement = new Container('')
   }
 
   /**
@@ -158,6 +164,11 @@ class Extractor {
     this.init()
 
     // Debug.
+    console.log(`Got ${this.selectorsCollection.count()} selectors to run.`)
+    // while (this.selectorsIterator.hasMore()) {
+    //   console.log('selectorsCollection item :')
+    //   console.log(this.selectorsIterator.next())
+    // }
     if (this.recursiveExtractionConfigs.length) {
       this.selectorsCollection.cycle(this.selectorsIterator, config => {
         console.log('selectorsCollection item :')
@@ -176,10 +187,11 @@ class Extractor {
 
     // 3. Run extraction steps (avoiding duplicates) and populate the
     // "extracted" collection.
-    this.selectorsCollection.cycle(this.selectorsIterator, async config => await this.step({
-      config,
-      extracted: this.result
-    }))
+    while (this.selectorsIterator.hasMore()) {
+      await this.step({
+        config: this.selectorsIterator.next()
+      })
+    }
 
     // 4. Generate the extraction result object from the "extracted" collection.
     this.extractedCollection.cycle(this.extractedIterator, extracted => {
@@ -193,6 +205,9 @@ class Extractor {
 
   /**
    * Populates the selectors collection based on extraction configs.
+   *
+   * TODO (wip) would be easier to create Leaf + Container instances as props of
+   * selectorsCollection items instead of later.
    */
   init () {
     for (let i = 0; i < this.entityExtractionConfigs.length; i++) {
@@ -261,7 +276,9 @@ class Extractor {
   async step (o) {
     // const { config, extracted, pageWorker, main, fieldOverride } = o
     // const { config, extracted, pageWorker, main, fieldOverride, debugIndent } = o
-    const { config, extracted, fieldOverride, debugIndent } = o
+    const { config, fieldOverride, debugIndent } = o
+
+    // this.extractedCollection
 
     // Preprocess selectors to handle scope in recusrive calls and customizations.
     // Also imposes a depth limit for nested extraction process to avoid infinite
@@ -286,14 +303,28 @@ class Extractor {
     console.log(`${debugIndent || ''}  ${config.selector}`)
     // }
 
-    // Support fields containing multiple items with props.
-    if (Array.isArray(config.extract)) {
-      await subItemsFieldProcess({ config, extracted, field })
+    // Differenciate fields or props that require recursive processing.
+    let extracted
+    if (this.isContainer(config)) {
+      extracted = new Container(config.selector)
+
+      // Debug.
+      console.log('recursive processing TODO for container :')
+      console.log(extracted)
+
       return
     }
 
+    // Support fields containing multiple items with props.
+    // if (Array.isArray(config.extract)) {
+    //   await subItemsFieldProcess({ config, extracted, field })
+    //   return
+    // }
+
     // Debug.
     console.log(`${debugIndent || ''}  extracting ${config.extract}`)
+
+    extracted = new Leaf(config.selector)
 
     // "Normal" process : config.extract is a string.
     switch (config.extract) {
@@ -354,6 +385,30 @@ class Extractor {
         break
       }
     }
+
+    this.extractedCollection.add(extracted)
+  }
+
+  /**
+   * Determines if current extraction config corresponds to a composite
+   * container or leaf.
+   *
+   * @param {Object} config selector collection item
+   */
+  isContainer (config) {
+    let hasNestedField = false
+
+    if (Array.isArray(config.extract)) {
+      config.extract.forEach(subConfig => {
+        if (this.isContainer(subConfig)) {
+          hasNestedField = true
+        }
+      })
+    } else {
+      hasNestedField = this.main.getSetting('extractionContainerTypes').includes(config.extract)
+    }
+
+    return hasNestedField
   }
 }
 

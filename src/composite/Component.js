@@ -6,9 +6,9 @@
  * a single (CSS) selector, which can match multiple elements.
  */
 class Component {
-  constructor (container, selector) {
-    this.container = container
+  constructor (selector, container) {
     this.selector = selector
+    this.container = container
   }
 
   getParent () {
