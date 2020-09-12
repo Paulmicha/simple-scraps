@@ -14,25 +14,31 @@ class Extractor {
   constructor (op, pageWorker, main) {
     const [entityType, bundle] = op.to.split('/')
 
-    // Get all defined extraction config that match current destination, unless
-    // directly specified in the op (for cases where a single URL is "hardcoded"
-    // in the entry point).
-    this.configs = []
-    if ('extract' in op) {
-      this.configs = op.extract
-    } else {
-      this.configs = this.mapConfig()
-    }
-
     this.result = {}
     this.entityType = entityType
     this.bundle = bundle
     this.pageWorker = pageWorker
     this.main = main
 
-    // The extraction process uses 2 collections :
+    // Set all defined extraction config that match current destination, unless
+    // directly specified in the op (for cases where a single URL is "hardcoded"
+    // in the entry point).
+    this.entityExtractionConfigs = []
+    if ('extract' in op) {
+      this.entityExtractionConfigs = op.extract
+    } else {
+      this.entityExtractionConfigs = this.mapConfig()
+    }
+
+    // Set recursive extraction configs (i.e. 'components' by default).
+    this.recursiveExtractionConfigs = []
+    this.main.getSetting('extractionContainerTypes').map(lookup => {
+      this.recursiveExtractionConfigs = this.recursiveExtractionConfigs.concat(this.mapConfig(lookup))
+    })
+
+    // The extraction process uses 2 (composite tree) collections :
     // 1. to build a representation of all the selectors to run on given page
-    // 2. to store the extraction result (composite tree).
+    // 2. to store the extraction result.
     this.selectorsCollection = new Collection()
     this.selectorsIterator = new Iterator(this.selectorsCollection)
     this.extractedCollection = new Collection()
@@ -119,11 +125,15 @@ class Extractor {
         throw Error("Cannot map 'start' config in Extractor because it would match entry points (and not extraction configs as expected)")
       }
 
-      // We allow wildcard support for any key.
+      // Simplest case : just return the matching key.
       if (!lookup.includes('/')) {
+        if (!(lookup in this.main.config)) {
+          throw Error('Cannot find given key in main config')
+        }
         return this.main.config[lookup]
       }
 
+      // Allow wildcard support for any key.
       lookupParts = lookup.split('/')
     }
 
@@ -144,21 +154,65 @@ class Extractor {
    */
   async run () {
     // 1. Populate the selectors collection based on extraction configs.
-    for (let i = 0; i < this.configs.length; i++) {
-      const config = this.configs[i]
-      // TODO (wip) set parent for tree sorting.
-      this.selectorsCollection.add(config)
-    }
-
     // 2. Sort the extraction steps to start from deepest levels ?
+    this.init()
     // 3. Run extraction steps (avoiding duplicates)
-
     // TODO (wip)
     return this.result
   }
 
   /**
-   * Processes an exctraction "cycle".
+   * Populates the selectors collection based on extraction configs.
+   */
+  init () {
+    for (let i = 0; i < this.entityExtractionConfigs.length; i++) {
+      const config = this.entityExtractionConfigs[i]
+      this.selectorsCollection.add(config)
+
+      if (this.recursiveExtractionConfigs.length) {
+        this.setNestedExtractionConfig(config)
+      }
+    }
+  }
+
+  /**
+   * TODO (wip) Nests extraction config for recursive fields or props lookups.
+   *
+   * The extraction config may contain fields (or props) that require
+   * recursive processing. In this case, we reference the parent extraction
+   * config for each nesting depth level in order to generate scoped
+   * selectors - i.e. prefixed with ancestors selectors.
+   */
+  setNestedExtractionConfig (config, parentConfig) {
+    if (!Array.isArray(config.extract) &&
+      this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
+      this.addRecursiveExtractionConfigs(config, parentConfig)
+    } else {
+      config.extract.forEach(subExtractionConfig =>
+        this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
+        this.setNestedExtractionConfig(subExtractionConfig, config)
+      )
+    }
+  }
+
+  /**
+   * TODO (wip) Adds nested extraction config to the selectors collection.
+   *
+   * @param {Object} config
+   * @param {Object} parentConfig
+   */
+  addRecursiveExtractionConfigs (config, parentConfig) {
+    this.recursiveExtractionConfigs.forEach(recursiveExtractionConfig => {
+      const subExtractionConfig = { ...recursiveExtractionConfig }
+      subExtractionConfig.config = config
+      subExtractionConfig.parentConfig = parentConfig
+      subExtractionConfig.scope = `${parentConfig.selector} ${config.selector}`
+      this.selectorsCollection.add(subExtractionConfig)
+    })
+  }
+
+  /**
+   * TODO (wip) Processes an exctraction "cycle".
    *
    * This is called recursively to allow nested components extraction.
    *
