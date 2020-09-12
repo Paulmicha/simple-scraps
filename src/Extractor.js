@@ -128,7 +128,7 @@ class Extractor {
       // Simplest case : just return the matching key.
       if (!lookup.includes('/')) {
         if (!(lookup in this.main.config)) {
-          throw Error('Cannot find given key in main config')
+          return []
         }
         return this.main.config[lookup]
       }
@@ -150,14 +150,44 @@ class Extractor {
   }
 
   /**
-   * Returns the final resulting object.
+   * TODO (wip) Returns the final resulting object.
    */
   async run () {
     // 1. Populate the selectors collection based on extraction configs.
     // 2. Sort the extraction steps to start from deepest levels ?
     this.init()
-    // 3. Run extraction steps (avoiding duplicates)
-    // TODO (wip)
+
+    // Debug.
+    if (this.recursiveExtractionConfigs.length) {
+      this.selectorsCollection.cycle(this.selectorsIterator, config => {
+        console.log('selectorsCollection item :')
+        console.log({
+          selector: config.selector,
+          nestedInSelector: config.nestedIn && config.nestedIn.selector,
+          parentSelector: config.parent && config.parent.selector
+        })
+      })
+    } else {
+      this.selectorsCollection.cycle(this.selectorsIterator, config => {
+        console.log('selectorsCollection item :')
+        console.log(config)
+      })
+    }
+
+    // 3. Run extraction steps (avoiding duplicates) and populate the
+    // "extracted" collection.
+    this.selectorsCollection.cycle(this.selectorsIterator, async config => await this.step({
+      config,
+      extracted: this.result
+    }))
+
+    // 4. Generate the extraction result object from the "extracted" collection.
+    this.extractedCollection.cycle(this.extractedIterator, extracted => {
+      // Debug.
+      console.log('extracted:')
+      console.log(extracted)
+    })
+
     return this.result
   }
 
@@ -204,87 +234,94 @@ class Extractor {
   addRecursiveExtractionConfigs (config, parentConfig) {
     this.recursiveExtractionConfigs.forEach(recursiveExtractionConfig => {
       const subExtractionConfig = { ...recursiveExtractionConfig }
-      subExtractionConfig.config = config
-      subExtractionConfig.parentConfig = parentConfig
-      subExtractionConfig.scope = `${parentConfig.selector} ${config.selector}`
+
+      subExtractionConfig.nestedIn = config
+      subExtractionConfig.scope = config.selector
+
+      if (parentConfig) {
+        subExtractionConfig.parentConfig = parentConfig
+        subExtractionConfig.scope = `${parentConfig.selector} ${config.selector}`
+      }
+
       this.selectorsCollection.add(subExtractionConfig)
     })
   }
 
   /**
-   * TODO (wip) Processes an exctraction "cycle".
+   * TODO (wip) Processes an exctraction "step".
    *
    * This is called recursively to allow nested components extraction.
    *
-   * The field or prop the given extractor will process is determined by the 'as'
+   * The field or prop the given config will process is determined by the 'as'
    * config key. Examples :
    * - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
    * - <thing>.<type>.<prop> (ex: component.Lede.text)
    * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
    */
   async step (o) {
-    // const { extractor, extracted, pageWorker, main, fieldOverride } = o
-    const { extractor, extracted, pageWorker, main, fieldOverride, debugIndent } = o
+    // const { config, extracted, pageWorker, main, fieldOverride } = o
+    // const { config, extracted, pageWorker, main, fieldOverride, debugIndent } = o
+    const { config, extracted, fieldOverride, debugIndent } = o
 
     // Preprocess selectors to handle scope in recusrive calls and customizations.
     // Also imposes a depth limit for nested extraction process to avoid infinite
     // recursions for components including components.
     // @see preprocessExtractor()
-    const carryOn = preprocessExtractor(o)
-    if (!carryOn) {
-      return
-    }
+    // const carryOn = preprocessExtractor(o)
+    // if (!carryOn) {
+    //   return
+    // }
 
     // By default, the field (or property) that is being extracted is the 2nd part
     // of the "as" key, but it needs to be overridable for nested components.
-    const destination = extractor.as.split('.')
+    const destination = config.as.split('.')
     let field = fieldOverride
     if (!field) {
       field = destination[1]
     }
 
     // Debug.
-    // if (extractor.depth >= 3) {
-    console.log(`${debugIndent || ''}run() ${field} for ${extractor.as}`)
-    console.log(`${debugIndent || ''}  ${extractor.selector}`)
+    // if (config.depth >= 3) {
+    console.log(`${debugIndent || ''}step() ${field} for ${config.as}`)
+    console.log(`${debugIndent || ''}  ${config.selector}`)
     // }
 
     // Support fields containing multiple items with props.
-    if (Array.isArray(extractor.extract)) {
-      await subItemsFieldProcess({ extractor, extracted, pageWorker, main, field })
+    if (Array.isArray(config.extract)) {
+      await subItemsFieldProcess({ config, extracted, field })
       return
     }
 
     // Debug.
-    console.log(`${debugIndent || ''}  extracting ${extractor.extract}`)
+    console.log(`${debugIndent || ''}  extracting ${config.extract}`)
 
-    // "Normal" process : extractor.extract is a string.
-    switch (extractor.extract) {
+    // "Normal" process : config.extract is a string.
+    switch (config.extract) {
       case 'text':
         extracted[field] = await dom.text(
-          pageWorker.page,
-          extractor.selector,
-          main.getSetting('plainTextRemoveBreaks')
+          this.pageWorker.page,
+          config.selector,
+          this.main.getSetting('plainTextRemoveBreaks')
         )
         break
       case 'text_single':
         extracted[field] = await dom.textSingle(
-          pageWorker.page,
-          extractor.selector,
-          main.getSetting('plainTextRemoveBreaks'),
-          main.getSetting('plainTextSeparator')
+          this.pageWorker.page,
+          config.selector,
+          this.main.getSetting('plainTextRemoveBreaks'),
+          this.main.getSetting('plainTextSeparator')
         )
         break
       case 'markup':
         extracted[field] = await dom.markup(
-          pageWorker.page,
-          extractor.selector,
-          main.getSetting('minifyExtractedHtml')
+          this.pageWorker.page,
+          config.selector,
+          this.main.getSetting('minifyExtractedHtml')
         )
         break
       // TODO implement an extraction for attribute(s).
       case 'element':
-        await elementFieldProcess({ extractor, extracted, pageWorker, main, field })
+        await elementFieldProcess({ config, extracted, field })
         break
       // In order to support nested components extraction, we need to start from
       // the "deepest" nesting levels to avoid matching the same elements multiple
@@ -293,7 +330,7 @@ class Extractor {
       // extraction and mark extracted components to avoid potential duplicates.
       // @see runrunSecondPass()
       case 'components': {
-        await componentsFieldProcess({ extractor, extracted, pageWorker, main, field })
+        await componentsFieldProcess({ config, extracted, field })
 
         // TODO other refactor in progress.
         /*
@@ -305,7 +342,7 @@ class Extractor {
         // Store references to placeholder objects in a single property directly
         // on the page worker instance for easier processing later on.
         // @see runSecondPass()
-        pageWorker.extractionPlaceholders.push({
+        this.pageWorker.extractionPlaceholders.push({
           placeholder: componentsFieldPlaceholder,
           context: o
         })
@@ -327,7 +364,7 @@ class Extractor {
  * selector syntax if there is a DOM Query Helper available in browsed page(s).
  * @see Page.addDomQueryHelper()
  *
- * If the extractor has a 'preprocess' key, its value serves as the event
+ * If the config has a 'preprocess' key, its value serves as the event
  * emitted to allow custom implementations that would prepare elements (e.g. add
  * custom classes) to facilitate the extraction process.
  *
@@ -347,75 +384,74 @@ class Extractor {
  * @returns {boolean} carry on or stops the recursive extraction process.
  */
 const preprocessExtractor = (o) => {
-  // const { extractor, pageWorker, main, parentExtractor } = o
-  const { extractor, main, parentExtractor } = o
+  const { config, parentExtractor } = o
 
-  // Assign an "ancestor chain" string to the extractor. It will we used for
+  // Assign an "ancestor chain" string to the config. It will we used for
   // easier processing during the second pass for nested components extraction.
   // @see run()
   let ancestors = []
   let ancestorsChain = ''
 
   if (parentExtractor) {
-    extractor.parent = parentExtractor
-    ancestors = getExtractorAncestors(extractor)
+    config.parent = parentExtractor
+    ancestors = getExtractorAncestors(config)
     ancestorsChain = ancestors.map(e => e.as).join(' <- ') + ' <- '
 
-    // Also assign a scope for current extractor, and prepend selector for
+    // Also assign a scope for current config, and prepend selector for
     // ensuring correct nesting during recusrive calls.
-    // if (!('scope' in extractor)) {
-    // console.log('-- there was already a scope on this extractor :')
-    // console.log('  ' + extractor.scope)
-    extractor.scope = parentExtractor.selector
-    extractor.selector = `${parentExtractor.selector} ${extractor.selector}`
+    // if (!('scope' in config)) {
+    // console.log('-- there was already a scope on this config :')
+    // console.log('  ' + config.scope)
+    config.scope = parentExtractor.selector
+    config.selector = `${parentExtractor.selector} ${config.selector}`
     // }
   }
 
-  extractor.depth = ancestors.length
-  extractor.ancestors = ancestors
-  extractor.ancestorsChain = ancestorsChain + extractor.as
+  config.depth = ancestors.length
+  config.ancestors = ancestors
+  config.ancestorsChain = ancestorsChain + config.as
 
   // Impose a depth limit, otherwise there would be inevitable infinite loops
   // when components include other components.
   // TODO this does not prevent memory leaks when trying to extract instances of
   // a component inside itself. See below.
-  if (extractor.depth > main.getSetting('maxExtractionNestingDepth')) {
+  if (config.depth > this.main.getSetting('maxExtractionNestingDepth')) {
     return false
   }
   // TODO find out why the fact of looking for a component instance inside
   // itself leads to memory leak, despite the limit on maximum depth. See above.
-  if (ancestorsChain.includes(` <- ${extractor.as} <- `)) {
+  if (ancestorsChain.includes(` <- ${config.as} <- `)) {
     // Debug.
     // console.log('')
-    // console.log(`  Forbid to look for instances of a component inside itself (${extractor.as} in '${ancestorsChain}')`)
+    // console.log(`  Forbid to look for instances of a component inside itself (${config.as} in '${ancestorsChain}')`)
     // console.log('')
     return false
   }
   // TODO (archive) memory leak tracking failed attempt.
-  // if (extractor.ancestorsChain.length) {
-  //   console.log(`  check ${extractor.ancestorsChain} in pageWorker.componentsExtracted ...`)
-  //   if (pageWorker.componentsExtracted.includes(extractor.ancestorsChain)) {
+  // if (config.ancestorsChain.length) {
+  //   console.log(`  check ${config.ancestorsChain} in this.pageWorker.componentsExtracted ...`)
+  //   if (this.pageWorker.componentsExtracted.includes(config.ancestorsChain)) {
   //     // Debug.
-  //     console.log(`  abort due to already processed ${extractor.ancestorsChain}`)
+  //     console.log(`  abort due to already processed ${config.ancestorsChain}`)
   //     return false
   //   }
-  //   pageWorker.componentsExtracted.push(extractor.ancestorsChain)
+  //   this.pageWorker.componentsExtracted.push(config.ancestorsChain)
   // }
 
   // Call any custom 'preprocess' implementations.
-  if ('preprocess' in extractor) {
-    main.emit(extractor.preprocess, o)
+  if ('preprocess' in config) {
+    this.main.emit(config.preprocess, o)
   }
 
   // Debug.
-  // const debugIndent = '  '.repeat(extractor.depth)
-  // console.log(`${debugIndent}depth ${extractor.depth} : ${extractor.ancestorsChain}`)
-  // console.log(`${debugIndent}  ( ${extractor.selector} )`)
+  // const debugIndent = '  '.repeat(config.depth)
+  // console.log(`${debugIndent}depth ${config.depth} : ${config.ancestorsChain}`)
+  // console.log(`${debugIndent}  ( ${config.selector} )`)
 
   // TODO [wip] next iteration :
   // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
   // classes).
-  // if (main.getSetting('addDomQueryHelper')) {
+  // if (this.main.getSetting('addDomQueryHelper')) {
   // }
 
   return true
@@ -424,13 +460,13 @@ const preprocessExtractor = (o) => {
 /**
  * Returns an array of extractors that represents the "nesting chain".
  *
- * @param {object} extractor
+ * @param {object} config
  */
-const getExtractorAncestors = (extractor) => {
+const getExtractorAncestors = (config) => {
   const ancestors = []
-  while (extractor.parent) {
-    ancestors.push(extractor.parent)
-    extractor = extractor.parent
+  while (config.parent) {
+    ancestors.push(config.parent)
+    config = config.parent
   }
   return ancestors.reverse()
 }
@@ -467,7 +503,7 @@ const getExtractorAncestors = (extractor) => {
  * create an array of objects. Each object can have 1 or many fields (or props).
  * Ex : component.MediaGrid.items[].title
  *  -> the component has an "items" property to be extracted as an array of
- *  objects, whose "title" is processed by a single sub-extractor run separately.
+ *  objects, whose "title" is processed by a single sub-config run separately.
  *
  * When a field has a single match, its value is a string and is considered to
  * belong to the 1st item. Hence, we need to delimit the scope of a single item
@@ -479,18 +515,18 @@ const getExtractorAncestors = (extractor) => {
  * belong to the same item.
  */
 const subItemsFieldProcess = async (o) => {
-  const { extractor, extracted, pageWorker, main, field } = o
+  const { config, extracted, field } = o
 
   // Debug.
   // console.log(`subItemsFieldProcess(${field})`)
-  // console.log(extractor.extract)
+  // console.log(config.extract)
 
   const subItem = {}
   // const subItemDelimiters = []
 
-  while (extractor.extract.length) {
-    const componentExtractor = extractor.extract.shift()
-    // componentExtractor.selector = `${extractor.selector} ${componentExtractor.selector}`
+  while (config.extract.length) {
+    const componentExtractor = config.extract.shift()
+    // componentExtractor.selector = `${config.selector} ${componentExtractor.selector}`
 
     const multiFieldItemProp = componentExtractor.as.split('.').pop()
 
@@ -512,12 +548,10 @@ const subItemsFieldProcess = async (o) => {
     console.log(`    subItemsFieldProcess() ${multiFieldItemProp} for ${componentExtractor.as}`)
     // console.log(`      ${componentExtractor.selector}`)
 
-    await run({
-      extractor: componentExtractor,
-      parentExtractor: extractor,
+    await this.step({
+      config: componentExtractor,
+      parentExtractor: config,
       extracted: subItem,
-      pageWorker,
-      main,
       fieldOverride: multiFieldItemProp,
       debugIndent: '      '
     })
@@ -571,7 +605,7 @@ const subItemsFieldProcess = async (o) => {
  *
  * For these, the extraction process needs to be provided via event handlers.
  *
- * Emits an event corresponding to the value of extractor.emit which gets
+ * Emits an event corresponding to the value of config.emit which gets
  * an object representing the extraction details, and which expects it to be
  * altered to add a callback function in its 'callback' prop.
  *
@@ -579,19 +613,19 @@ const subItemsFieldProcess = async (o) => {
  *  items => items.map(item => item.innerHTML)
  */
 const elementFieldProcess = async (o) => {
-  const { extractor, extracted, pageWorker, main, field } = o
+  const { config, extracted, field } = o
 
-  if (!extractor.emit) {
-    throw Error('Missing extractor "emit" config for processing ' + extractor.as + ', selector : ' + extractor.selector)
+  if (!config.emit) {
+    throw Error('Missing config "emit" config for processing ' + config.as + ', selector : ' + config.selector)
   }
 
   // Debug.
-  // console.log(`emitting event '${extractor.emit}'`)
+  // console.log(`emitting event '${config.emit}'`)
 
   // The event listeners may provide either :
   //  - a callback function which will be used by puppeteer's page.$$eval() API
   //  - the field value directly (takes precedence if set)
-  main.emit(extractor.emit, o)
+  this.main.emit(config.emit, o)
 
   if ('result' in o) {
     extracted[field] = o.result
@@ -599,9 +633,9 @@ const elementFieldProcess = async (o) => {
   }
 
   if (!o.callback) {
-    throw Error('Missing callback for processing ' + extractor.as + ', selector : ' + extractor.selector)
+    throw Error('Missing callback for processing ' + config.as + ', selector : ' + config.selector)
   }
-  extracted[field] = await element(pageWorker.page, extractor.selector, o.callback)
+  extracted[field] = await element(this.pageWorker.page, config.selector, o.callback)
 }
 
 /**
@@ -620,7 +654,7 @@ const componentsFieldProcess = async (o) => {
   const { extracted, field } = o
 
   // Debug.
-  console.log(`componentsFieldProcess() : ${o.extractor.as}`)
+  console.log(`componentsFieldProcess() : ${o.config.as}`)
 
   const components = []
   const contexts = component.getExtractionContexts(o)
@@ -631,13 +665,13 @@ const componentsFieldProcess = async (o) => {
     context.extracted = c
 
     // Debug.
-    // console.log(`  Will run extraction context : ${context.extractor.as} (type:${context.type}, props:${context.props})`)
+    // console.log(`  Will run extraction context : ${context.config.as} (type:${context.type}, props:${context.props})`)
 
     await run(context)
 
     // Debug.
-    // console.log(`Look for ${o.extractor.as} / ${context.extractor.as} (depth : ${context.extractor.depth})`)
-    // console.log(`  parents : ${context.extractor.ancestorsChain}`)
+    // console.log(`Look for ${o.config.as} / ${context.config.as} (depth : ${context.config.depth})`)
+    // console.log(`  parents : ${context.config.ancestorsChain}`)
 
     // TODO why empty object has Object.keys(c).length of 1 ?
     // if (Object.keys(c).length !== 0) {
@@ -657,6 +691,4 @@ const componentsFieldProcess = async (o) => {
   extracted[field] = components
 }
 
-module.exports = {
-  Extractor
-}
+module.exports = Extractor

@@ -22,6 +22,7 @@ class Collection {
     while (iterator.hasMore()) {
       callback(iterator.next())
     }
+    iterator.reset()
   }
 }
 

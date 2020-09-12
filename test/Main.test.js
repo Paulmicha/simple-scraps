@@ -54,7 +54,7 @@ test.serial('1. Extract a single string (plain text + HTML markup)', async t => 
   await scraps.run()
 })
 
-test.serial('2. Extract a simple component', async t => {
+/* test.serial('2. Extract a simple component', async t => {
   const scraps = new SimpleScraps({
     settings: {
       crawlDelay: false
@@ -97,9 +97,9 @@ test.serial('2. Extract a simple component', async t => {
   })
 
   await scraps.run()
-})
+}) */
 
-test.serial('3. Extract nested components', async t => {
+/* test.serial('3. Extract nested components', async t => {
   const scraps = new SimpleScraps(nestedComponentsConfig)
 
   scraps.on('store.extraction.result', (entity, entityType, bundle, url, pageWorker) => {
@@ -114,14 +114,14 @@ test.serial('3. Extract nested components', async t => {
 
     // Debug.
     console.log('TODO (wip) Extract nested components :')
-    // console.log([entity, entityType, bundle, url])
+    console.log([entity, entityType, bundle, url])
     // console.log(entity.content)
     // console.log(entity.content[1].props)
     // console.log(entity.content[1].props.items[0].content)
     // console.log(JSON.stringify(entity, null, 2))
     // console.log('TODO (wip) Extracted NavTabs component :')
-    console.log(JSON.stringify(entity.content[1].props, null, 2))
+    // console.log(JSON.stringify(entity.content[1].props, null, 2))
   })
 
   await scraps.run()
-})
+}) */

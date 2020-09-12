@@ -391,14 +391,14 @@ class Main extends EventEmitter {
     }
 
     const extractor = new Extractor(op, pageWorker, this)
-    const entity = extractor.run()
+    const entity = await extractor.run()
 
     // Allow alterations before saving.
     this.emit('alter.extraction.result', entity, extractor)
 
     // Debug.
-    // console.log(`Main - resulting entity object (${entityType}.${bundle}) :`)
-    // console.log(entity)
+    console.log(`Main - resulting entity object (${extractor.entityType}.${extractor.bundle}) :`)
+    console.log(entity)
     // console.log(`Main - resulting entity object (${entityType}.${bundle}) *content[1].props* :`)
     // console.log(entity.content[1].props)
 
