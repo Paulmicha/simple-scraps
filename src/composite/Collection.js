@@ -1,21 +1,24 @@
 
 /**
- * Represents all objects extracted from a page DOM tree.
+ * Composite store.
  */
 class Collection {
-  constructor (iterator) {
+  constructor () {
     this.items = []
-    this.iterator = iterator
   }
 
-  cycle (callback) {
-    while (this.iterator.hasMore()) {
-      callback(this.iterator.next())
-    }
+  add (item) {
+    this.items.push(item)
   }
 
   count () {
     return this.items.length
+  }
+
+  cycle (iterator, callback) {
+    while (iterator.hasMore()) {
+      callback(iterator.next())
+    }
   }
 }
 

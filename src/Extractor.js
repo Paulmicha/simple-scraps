@@ -1,4 +1,6 @@
 const dom = require('./utils/dom')
+const Collection = require('./composite/Collection')
+const Iterator = require('./composite/Iterator')
 
 /**
  * Defines the process of extracting a structured object from a page.
@@ -15,42 +17,108 @@ class Extractor {
     // Get all defined extraction config that match current destination, unless
     // directly specified in the op (for cases where a single URL is "hardcoded"
     // in conf).
-    let configs = []
+    this.configs = []
     if ('extract' in op) {
-      configs = op.extract
+      this.configs = op.extract
     } else {
-      configs = this.mapConfig()
+      this.configs = this.mapConfig()
     }
 
-    this.configs = configs
     this.result = {}
     this.entityType = entityType
     this.bundle = bundle
     this.pageWorker = pageWorker
     this.main = main
+
+    // The extraction process uses 2 collections :
+    // 1. to build a representation of all the selectors to run on given page
+    // 2. to store the extraction result (composite tree).
+    this.selectorsCollection = new Collection()
+    this.selectorsIterator = new Iterator(this.selectorsCollection)
+    this.extractedCollection = new Collection()
+    this.extractedIterator = new Iterator(this.extractedCollection)
   }
 
   /**
    * Maps extraction definitions to entity type.
+   *
+   * @example
+   *   // Given this main configuration object :
+   *   this.main.config = {
+   *     "start": [
+   *       {
+   *         "url": "http://example.com/blog",
+   *         "follow": [
+   *           {
+   *             "selector": ".articles-list h2 > a",
+   *             "to": "content/blog"
+   *           },
+   *           {
+   *             "selector": ".articles-list .pager a",
+   *             "to": "start"
+   *           }
+   *         ]
+   *       }
+   *     ],
+   *     "content/*": [
+   *       {
+   *         "selector": "header h1.c-title",
+   *         "extract": "text",
+   *         "as": "entity.title"
+   *       },
+   *       ... (rest of extraction configs)
+   *     ],
+   *     "content/blog": [
+   *       {
+   *         "selector": "article.node .field-name-field-tags > a",
+   *         "extract": "text",
+   *         "as": "entity.tags"
+   *       },
+   *       ... (rest of extraction configs)
+   *     ],
+   *     "content/page": [
+   *       {
+   *         "selector": ".pane > .pane-content",
+   *         "extract": "markup",
+   *         "as": "entity.panes"
+   *       },
+   *       ... (rest of extraction configs)
+   *     ]
+   *   }
+   *   // This will return all extraction definitions matching the operation
+   *   // destination (this.entityType and this.bundle), i.e. an array
+   *   // containing all items of this.main.config['content/*'] and
+   *   // this.main.config['content/blog'] - the '*' being a wildcard.
    */
   mapConfig () {
-    let extractors = []
+    let configs = []
 
     Object.keys(this.main.config)
       .filter(key => key !== 'start')
       .map(key => key.split('/'))
-      .filter(keyParts => keyParts[0] === this.entityType)
+      .filter(keyParts => keyParts[0] === this.entityType &&
+        (keyParts[1] === this.bundle || keyParts[1] === '*'))
       .map(keyParts => {
-        extractors = extractors.concat(this.main.config[keyParts.join('/')])
+        configs = configs.concat(this.main.config[keyParts.join('/')])
       })
 
-    return extractors
+    return configs
   }
 
   /**
    * Returns the final resulting object.
    */
   async run () {
+    // 1. Populate the selectors collection based on extraction configs.
+    for (let i = 0; i < this.configs.length; i++) {
+      const config = this.configs[i]
+      // TODO (wip) set parent for tree sorting.
+      this.selectorsCollection.add(config)
+    }
+
+    // 2. Sort the extraction steps to start from deepest levels ?
+    // 3. Run extraction steps (avoiding duplicates)
+
     // TODO (wip)
     return this.result
   }
@@ -105,14 +173,14 @@ class Extractor {
     // "Normal" process : extractor.extract is a string.
     switch (extractor.extract) {
       case 'text':
-        extracted[field] = await text(
+        extracted[field] = await dom.text(
           pageWorker.page,
           extractor.selector,
           main.getSetting('plainTextRemoveBreaks')
         )
         break
       case 'text_single':
-        extracted[field] = await textSingle(
+        extracted[field] = await dom.textSingle(
           pageWorker.page,
           extractor.selector,
           main.getSetting('plainTextRemoveBreaks'),
@@ -120,7 +188,7 @@ class Extractor {
         )
         break
       case 'markup':
-        extracted[field] = await markup(
+        extracted[field] = await dom.markup(
           pageWorker.page,
           extractor.selector,
           main.getSetting('minifyExtractedHtml')
