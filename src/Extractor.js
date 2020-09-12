@@ -156,6 +156,125 @@ class Extractor {
   }
 
   /**
+   * Populates the selectors collection based on extraction configs.
+   *
+   * We need to obtain instances of composite Leaf and Container classes to
+   * represent what will be extracted :
+   *   1. Single fields or properties of the main entity being extracted
+   *     (because 1 Extractor works on 1 open page = 1 resulting object)
+   *   2. Groups of multiple fields or properties (e.g. a component)
+   *   3. Nested components as field or property value (either of the page being
+   *     extracted or of one of its components)
+   */
+  init () {
+    for (let i = 0; i < this.entityExtractionConfigs.length; i++) {
+      const config = this.entityExtractionConfigs[i]
+      const isContainer = this.isContainer(config)
+
+      // If this extraction config has multiple sub-extraction configs, it must
+      // be represented by a single composite instance having multiple fields or
+      // properties (e.g. a component)
+      if (Array.isArray(config.extract)) {
+        if (isContainer) {
+          config.instance = new Container(config.selector)
+        } else {
+          config.instance = new Leaf(config.selector)
+        }
+
+        config.extract.map(subExtractionConfig => {
+          subExtractionConfig.parent = config
+
+          // All sub-extraction configs are "working" on the same instance (the
+          // group of fields or properties).
+          subExtractionConfig.instance = config.instance
+
+          // Any field or property of this group can contain nested components.
+          if (this.recursiveExtractionConfigs.length) {
+            this.setNestedExtractionConfig(subExtractionConfig, config)
+          }
+
+          this.selectorsCollection.add(subExtractionConfig)
+        })
+      } else {
+        // Otherwise, we're dealing with individual fields or properties of the
+        // main entity being extracted (i.e. at the root of the tree).
+        config.instance = this.rootElement
+
+        // A single field can still contain nested components.
+        if (this.recursiveExtractionConfigs.length) {
+          this.setNestedExtractionConfig(config)
+        }
+
+        this.selectorsCollection.add(config)
+      }
+    }
+  }
+
+  /**
+   * Determines if current extraction config corresponds to a composite
+   * container or leaf.
+   *
+   * @param {Object} config selector collection item
+   */
+  isContainer (config) {
+    let hasNestedField = false
+
+    if (Array.isArray(config.extract)) {
+      config.extract.forEach(subConfig => {
+        if (this.isContainer(subConfig)) {
+          hasNestedField = true
+        }
+      })
+    } else {
+      hasNestedField = this.main.getSetting('extractionContainerTypes').includes(config.extract)
+    }
+
+    return hasNestedField
+  }
+
+  /**
+   * TODO (wip) Nests extraction config for recursive fields or props lookups.
+   *
+   * The extraction config may contain fields (or props) that require
+   * recursive processing. In this case, we reference the parent extraction
+   * config for each nesting depth level in order to generate scoped
+   * selectors - i.e. prefixed with ancestors selectors.
+   */
+  setNestedExtractionConfig (config, parentConfig) {
+    if (!Array.isArray(config.extract) &&
+      this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
+      this.addRecursiveExtractionConfigs(config, parentConfig)
+    } else {
+      config.extract.forEach(subExtractionConfig =>
+        this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
+        this.setNestedExtractionConfig(subExtractionConfig, config)
+      )
+    }
+  }
+
+  /**
+   * TODO (wip) Adds nested extraction config to the selectors collection.
+   *
+   * @param {Object} config
+   * @param {Object} parentConfig
+   */
+  addRecursiveExtractionConfigs (config, parentConfig) {
+    this.recursiveExtractionConfigs.forEach(recursiveExtractionConfig => {
+      const subExtractionConfig = { ...recursiveExtractionConfig }
+
+      subExtractionConfig.nestedIn = config
+      subExtractionConfig.scope = config.selector
+
+      if (parentConfig) {
+        subExtractionConfig.parentConfig = parentConfig
+        subExtractionConfig.scope = `${parentConfig.selector} ${config.selector}`
+      }
+
+      this.selectorsCollection.add(subExtractionConfig)
+    })
+  }
+
+  /**
    * TODO (wip) Returns the final resulting object.
    */
   async run () {
@@ -204,65 +323,6 @@ class Extractor {
   }
 
   /**
-   * Populates the selectors collection based on extraction configs.
-   *
-   * TODO (wip) would be easier to create Leaf + Container instances as props of
-   * selectorsCollection items instead of later.
-   */
-  init () {
-    for (let i = 0; i < this.entityExtractionConfigs.length; i++) {
-      const config = this.entityExtractionConfigs[i]
-      this.selectorsCollection.add(config)
-
-      if (this.recursiveExtractionConfigs.length) {
-        this.setNestedExtractionConfig(config)
-      }
-    }
-  }
-
-  /**
-   * TODO (wip) Nests extraction config for recursive fields or props lookups.
-   *
-   * The extraction config may contain fields (or props) that require
-   * recursive processing. In this case, we reference the parent extraction
-   * config for each nesting depth level in order to generate scoped
-   * selectors - i.e. prefixed with ancestors selectors.
-   */
-  setNestedExtractionConfig (config, parentConfig) {
-    if (!Array.isArray(config.extract) &&
-      this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
-      this.addRecursiveExtractionConfigs(config, parentConfig)
-    } else {
-      config.extract.forEach(subExtractionConfig =>
-        this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
-        this.setNestedExtractionConfig(subExtractionConfig, config)
-      )
-    }
-  }
-
-  /**
-   * TODO (wip) Adds nested extraction config to the selectors collection.
-   *
-   * @param {Object} config
-   * @param {Object} parentConfig
-   */
-  addRecursiveExtractionConfigs (config, parentConfig) {
-    this.recursiveExtractionConfigs.forEach(recursiveExtractionConfig => {
-      const subExtractionConfig = { ...recursiveExtractionConfig }
-
-      subExtractionConfig.nestedIn = config
-      subExtractionConfig.scope = config.selector
-
-      if (parentConfig) {
-        subExtractionConfig.parentConfig = parentConfig
-        subExtractionConfig.scope = `${parentConfig.selector} ${config.selector}`
-      }
-
-      this.selectorsCollection.add(subExtractionConfig)
-    })
-  }
-
-  /**
    * TODO (wip) Processes an exctraction "step".
    *
    * This is called recursively to allow nested components extraction.
@@ -276,7 +336,7 @@ class Extractor {
   async step (o) {
     // const { config, extracted, pageWorker, main, fieldOverride } = o
     // const { config, extracted, pageWorker, main, fieldOverride, debugIndent } = o
-    const { config, fieldOverride, debugIndent } = o
+    const { config, extracted, fieldOverride, debugIndent } = o
 
     // this.extractedCollection
 
@@ -303,18 +363,6 @@ class Extractor {
     console.log(`${debugIndent || ''}  ${config.selector}`)
     // }
 
-    // Differenciate fields or props that require recursive processing.
-    let extracted
-    if (this.isContainer(config)) {
-      extracted = new Container(config.selector)
-
-      // Debug.
-      console.log('recursive processing TODO for container :')
-      console.log(extracted)
-
-      return
-    }
-
     // Support fields containing multiple items with props.
     // if (Array.isArray(config.extract)) {
     //   await subItemsFieldProcess({ config, extracted, field })
@@ -323,8 +371,6 @@ class Extractor {
 
     // Debug.
     console.log(`${debugIndent || ''}  extracting ${config.extract}`)
-
-    extracted = new Leaf(config.selector)
 
     // "Normal" process : config.extract is a string.
     switch (config.extract) {
@@ -387,28 +433,6 @@ class Extractor {
     }
 
     this.extractedCollection.add(extracted)
-  }
-
-  /**
-   * Determines if current extraction config corresponds to a composite
-   * container or leaf.
-   *
-   * @param {Object} config selector collection item
-   */
-  isContainer (config) {
-    let hasNestedField = false
-
-    if (Array.isArray(config.extract)) {
-      config.extract.forEach(subConfig => {
-        if (this.isContainer(subConfig)) {
-          hasNestedField = true
-        }
-      })
-    } else {
-      hasNestedField = this.main.getSetting('extractionContainerTypes').includes(config.extract)
-    }
-
-    return hasNestedField
   }
 }
 
