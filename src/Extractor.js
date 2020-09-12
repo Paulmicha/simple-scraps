@@ -16,7 +16,7 @@ class Extractor {
 
     // Get all defined extraction config that match current destination, unless
     // directly specified in the op (for cases where a single URL is "hardcoded"
-    // in conf).
+    // in the entry point).
     this.configs = []
     if ('extract' in op) {
       this.configs = op.extract
@@ -40,7 +40,13 @@ class Extractor {
   }
 
   /**
-   * Maps extraction definitions to entity type.
+   * Returns extraction definitions from main config.
+   *
+   * @param {string} lookup (optional) : specifies which configuration to get.
+   *   Defaults to return the extraction configurations matching this.entityType
+   *   and this.bundle. Otherwise, any value passed in this argument simply
+   *   matches the corresponding key in main config (except 'start', which
+   *   contains the entry points).
    *
    * @example
    *   // Given this main configuration object :
@@ -55,10 +61,11 @@ class Extractor {
    *           },
    *           {
    *             "selector": ".articles-list .pager a",
-   *             "to": "start"
+   *             "to": "follow"
    *           }
    *         ]
-   *       }
+   *       },
+   *       ... (here, the rest of entry points)
    *     ],
    *     "content/*": [
    *       {
@@ -66,7 +73,7 @@ class Extractor {
    *         "extract": "text",
    *         "as": "entity.title"
    *       },
-   *       ... (rest of extraction configs)
+   *       ... (here, the rest of extraction configs)
    *     ],
    *     "content/blog": [
    *       {
@@ -74,7 +81,7 @@ class Extractor {
    *         "extract": "text",
    *         "as": "entity.tags"
    *       },
-   *       ... (rest of extraction configs)
+   *       ... (here, the rest of extraction configs)
    *     ],
    *     "content/page": [
    *       {
@@ -82,22 +89,49 @@ class Extractor {
    *         "extract": "markup",
    *         "as": "entity.panes"
    *       },
-   *       ... (rest of extraction configs)
+   *       ... (here, the rest of extraction configs)
+   *     ],
+   *     "components": [
+   *       ... (here, the components extraction configs)
    *     ]
    *   }
+   *
    *   // This will return all extraction definitions matching the operation
    *   // destination (this.entityType and this.bundle), i.e. an array
    *   // containing all items of this.main.config['content/*'] and
-   *   // this.main.config['content/blog'] - the '*' being a wildcard.
+   *   // this.main.config['content/blog'] - the '*' being a wildcard :
+   *   const extractionConfigs = this.mapConfig()
+   *
+   *   // This would return all 'components' extraction configs (i.e.
+   *   // this.main.config['components']) :
+   *   const componentsExtractionConfigs = this.mapConfig('components')
+   *
+   *   // There is also support for wildcards - e.g. this would return all
+   *   //  'content/*' extraction configs :
+   *   const contentExtractionConfigs = this.mapConfig('content/*')
    */
-  mapConfig () {
+  mapConfig (lookup) {
     let configs = []
+    let lookupParts = [this.entityType, this.bundle]
+
+    if (lookup) {
+      if (lookup === 'start') {
+        throw Error("Cannot map 'start' config in Extractor because it would match entry points (and not extraction configs as expected)")
+      }
+
+      // We allow wildcard support for any key.
+      if (!lookup.includes('/')) {
+        return this.main.config[lookup]
+      }
+
+      lookupParts = lookup.split('/')
+    }
 
     Object.keys(this.main.config)
       .filter(key => key !== 'start')
       .map(key => key.split('/'))
-      .filter(keyParts => keyParts[0] === this.entityType &&
-        (keyParts[1] === this.bundle || keyParts[1] === '*'))
+      .filter(keyParts => keyParts[0] === lookupParts[0] &&
+        (keyParts[1] === lookupParts[1] || keyParts[1] === '*'))
       .map(keyParts => {
         configs = configs.concat(this.main.config[keyParts.join('/')])
       })

@@ -1,6 +1,9 @@
 
 /**
  * Composite store.
+ *
+ * There is nothing fundamentally different than a simple array here, but for
+ * clarity's sake, this class explicitly signals the design pattern used.
  */
 class Collection {
   constructor () {
