@@ -1,9 +1,9 @@
 const dom = require('./utils/dom')
 const Collection = require('./composite/Collection')
-// const Iterator = require('./composite/Iterator')
+const Step = require('./composite/Step')
 const Container = require('./composite/Container')
-const ExportVisitor = require('./composite/ExportVisitor')
 const Leaf = require('./composite/Leaf')
+const ExportVisitor = require('./composite/ExportVisitor')
 
 /**
  * Defines the process of extracting a structured object from a page.
@@ -165,10 +165,6 @@ class Extractor {
   }
 
   /**
-   * TODO (wip) refactor to use a CollectionItem class (name TBD) instead that
-   * would bind together the config with the components and related
-   * implementations.
-   *
    * Populates the composite collection based on extraction configs.
    *
    * We need to obtain instances of composite Leaf and Container classes to
@@ -209,10 +205,10 @@ class Extractor {
 
           // Any field or property of this group can contain nested components.
           if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-            this.setNestedExtractionConfig(subExtractionConfig, config)
+            this.setNestedExtractionConfig(subExtractionConfig)
           }
 
-          this.tree.add(subExtractionConfig)
+          this.tree.add(new Step(subExtractionConfig, this.main))
         })
       } else {
         // Otherwise, we're dealing with individual fields or properties of the
@@ -226,47 +222,29 @@ class Extractor {
           this.setNestedExtractionConfig(config)
         }
 
-        this.tree.add(config)
+        this.tree.add(new Step(config, this.main))
       }
     }
   }
 
   /**
-   * Determines if current extraction config corresponds to a composite
-   * container or leaf.
-   *
-   * @param {Object} config extraction config
-   */
-  isContainer (config) {
-    if (Array.isArray(config.extract)) {
-      for (let i = 0; i < config.extract.length; i++) {
-        const subConfig = config.extract[i]
-        if (this.isContainer(subConfig)) {
-          return true
-        }
-      }
-    } else {
-      return this.main.getSetting('extractionContainerTypes').includes(config.extract)
-    }
-    return false
-  }
-
-  /**
-   * TODO (wip) Nests extraction config for recursive fields or props lookups.
+   * Nests extraction config for recursive fields or props lookups.
    *
    * The extraction config may contain fields (or props) that require
    * recursive processing. In this case, we reference the parent extraction
    * config for each nesting depth level in order to generate scoped
    * selectors - i.e. prefixed with ancestors selectors.
    */
-  setNestedExtractionConfig (config, parentConfig) {
+  setNestedExtractionConfig (config) {
     if (Array.isArray(config.extract)) {
       config.extract.forEach(subExtractionConfig =>
         this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
         this.setNestedExtractionConfig(subExtractionConfig, config)
       )
     } else if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
-      const nestingLevel = this.getAncestors(config).length
+      const ancestors = this.getAncestors(config)
+      const nestingLevel = ancestors.length
+      config.ancestors = ancestors
 
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
         this.init(this.nestedExtractionConfigs, config, nestingLevel)
@@ -286,7 +264,8 @@ class Extractor {
     // if (this.isRecursive) {
     //   this.setAncestorsChain()
     // }
-    this.iterator.cycle(config => this.preprocess(config))
+    this.iterator.cycle(step => step.preprocess())
+    this.iterator.cycle(step => step.setDescendants(this.getDescendants(step)))
 
     // Debug.
     // console.log(`Got ${this.tree.count()} selectors to run.`)
@@ -297,12 +276,12 @@ class Extractor {
 
     // 3. Run extraction steps (avoiding duplicates) and populate the
     // "extracted" collection.
-    await this.iterator.cycleAsync(async config => await this.step({ config }))
+    await this.iterator.cycleAsync(async step => await this.process(step))
 
     // 4. Generate the extraction result object.
     // When no nested fields were found, we are extracting a single entity from
     // the entire page. Otherwise, the result will need to be built recursively.
-    const exporter = new ExportVisitor()
+    const exporter = new ExportVisitor(this.iterator)
     switch (this.rootElement.constructor.name) {
       case 'Leaf':
         this.result = exporter.visitLeaf(this.rootElement)
@@ -322,7 +301,8 @@ class Extractor {
   // }
 
   /**
-   * Returns an array of extraction configs that represents the "nesting chain".
+   * Returns an array of extraction configs that represents the "nesting chain"
+   * from current level to root.
    *
    * @param {object} config
    */
@@ -336,71 +316,13 @@ class Extractor {
   }
 
   /**
-   * Preprocesses extraction config before running the actual process.
-   *
-   * This facilitates scope handling, allows customizations and jQuery-like
-   * selector syntax if there is a DOM Query Helper available in browsed page(s).
-   * @see Page.addDomQueryHelper()
-   *
-   * If the config has a 'preprocess' key, its value serves as the event
-   * emitted to allow custom implementations that would prepare elements (e.g. add
-   * custom classes) to facilitate the extraction process.
-   *
-   * Examples of jQuery-like syntax :
-   *   1. Set a custom class on parent element and use it as new scope :
-   *     "selector": ".nav-tabs.parent()"
-   *   2. Idem, but using closest() to set scope in any ancestor (stops at closest
-   *    match) :
-   *     "selector": ".nav-tabs.closest(section)"
-   *   3. Going up then down the DOM tree :
-   *     "selector": ".nav-tabs.closest(section).find(.something)"
-   *
-   * @param {Object} config
+   * TODO (wip) would be used for depth sorting + components process
+   * Returns an array of extraction configs that represents the "nesting chain"
+   * from current level to deepest level.
    */
-  preprocess (config) {
-    let ancestors = []
-    let ancestorsChain = ''
-
-    if (config.parent) {
-      ancestors = this.getAncestors(config)
-      ancestorsChain = ancestors.map(e => e.as).join(' <- ') + ' <- '
-
-      // Assign a scope for current config, and prepend selector for ensuring
-      // correct nesting.
-      if (config.parent.selector) {
-        config.scope = config.parent.selector
-        config.selector = `${config.parent.selector} ${config.selector}`
-      }
-
-      // TODO (wip) implement generic destination field mapping for nested
-      // extraction configs ? Using hardcoded index for now.
-      const destination = config.as.split('.')
-      if (destination.length > 2) {
-        config.fieldOverride = destination[2]
-      }
-    }
-
-    config.depth = ancestors.length
-    config.ancestors = ancestors
-    config.ancestorsChain = ancestorsChain + config.as
-
-    // Call any custom 'preprocess' implementations.
-    if ('preprocess' in config) {
-      this.main.emit(config.preprocess, config)
-    }
-
-    // Debug.
-    const debugIndent = '  '.repeat(config.depth)
-    console.log(`${debugIndent}depth ${config.depth} : ${config.ancestorsChain}`)
-    console.log(`${debugIndent}  ( ${config.selector} )`)
-    if (config.fieldOverride) {
-      console.log(`${debugIndent}  as ${config.fieldOverride}`)
-    }
-
-    // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
-    // classes).
-    // if (this.main.getSetting('addDomQueryHelper')) {
-    // }
+  getDescendants (step) {
+    // const descendants = []
+    // return descendants
   }
 
   /**
@@ -414,36 +336,14 @@ class Extractor {
    * - <thing>.<type>.<prop> (ex: component.Lede.text)
    * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
    */
-  async step (o) {
-    // const { config, extracted, pageWorker, main, fieldOverride } = o
-    // const { config, extracted, pageWorker, main, fieldOverride, debugIndent } = o
-    const { config, debugIndent } = o
-
-    const component = config.component
-
-    // this.extractedCollection
-
-    // Preprocess selectors to handle scope in recusrive calls and customizations.
-    // Also imposes a depth limit for nested extraction process to avoid infinite
-    // recursions for components including components.
-    // @see preprocessExtractor()
-    // const carryOn = preprocessExtractor(o)
-    // if (!carryOn) {
-    //   return
-    // }
-
-    // By default, the field (or property) that is being extracted is the 2nd part
-    // of the "as" key, but it needs to be overridable for nested components.
-    const destination = config.as.split('.')
-    let field = destination[1]
-    if (config.fieldOverride) {
-      field = config.fieldOverride
-    }
+  async process (step, debugIndent) {
+    const component = step.getComponent()
+    const field = step.getField()
 
     // Debug.
     // if (config.depth >= 3) {
-    console.log(`${debugIndent || ''}step() ${field} for ${config.as}`)
-    console.log(`${debugIndent || ''}  ${config.selector}`)
+    console.log(`${debugIndent || ''}step() ${field} for ${step.as}`)
+    console.log(`${debugIndent || ''}  ${step.selector}`)
     // }
 
     // Support fields containing multiple items with props.
@@ -453,15 +353,15 @@ class Extractor {
     // }
 
     // Debug.
-    console.log(`${debugIndent || ''}  extracting ${config.extract}`)
+    console.log(`${debugIndent || ''}  extracting ${step.extract}`)
 
     // "Normal" process : config.extract is a string.
-    switch (config.extract) {
+    switch (step.extract) {
       case 'text': {
         // const value = await dom.text(
         component.setField(field, await dom.text(
           this.pageWorker.page,
-          config.selector,
+          step.selector,
           this.main.getSetting('plainTextRemoveBreaks')
         ))
         // )
@@ -477,7 +377,7 @@ class Extractor {
       case 'text_single':
         component.setField(field, await dom.textSingle(
           this.pageWorker.page,
-          config.selector,
+          step.selector,
           this.main.getSetting('plainTextRemoveBreaks'),
           this.main.getSetting('plainTextSeparator')
         ))
@@ -485,7 +385,7 @@ class Extractor {
       case 'markup':
         component.setField(field, await dom.markup(
           this.pageWorker.page,
-          config.selector,
+          step.selector,
           this.main.getSetting('minifyExtractedHtml')
         ))
         break
@@ -493,10 +393,11 @@ class Extractor {
       // TODO (wip) refactor in progress.
       // TODO implement an extraction for attribute(s).
       case 'element':
-        await elementFieldProcess({ config, component, field })
+        await elementFieldProcess({ step, component, field })
         break
 
-      // TODO (wip) refactor in progress : need to make recursive calls to step()
+      // TODO (wip) refactor in progress : need to make recursive calls
+
       // In order to support nested components extraction, we need to start from
       // the "deepest" nesting levels to avoid matching the same elements multiple
       // times. This is achieved by storing 'components' fields aside for later
@@ -505,7 +406,7 @@ class Extractor {
       // @see runrunSecondPass()
       case 'components': {
         // Debug.
-        console.log(config)
+        console.log(step)
 
         // await componentsFieldProcess({ config, component, field })
 
@@ -532,120 +433,6 @@ class Extractor {
       }
     }
   }
-}
-
-/**
- * Preprocessor allowing components nesting, scope, and custom selectors.
- *
- * This facilitates scope handling, allows customizations and jQuery-like
- * selector syntax if there is a DOM Query Helper available in browsed page(s).
- * @see Page.addDomQueryHelper()
- *
- * If the config has a 'preprocess' key, its value serves as the event
- * emitted to allow custom implementations that would prepare elements (e.g. add
- * custom classes) to facilitate the extraction process.
- *
- * Examples of jQuery-like syntax :
- *   1. Set a custom class on parent element and use it as new scope :
- *     "selector": ".nav-tabs.parent()"
- *   2. Idem, but using closest() to set scope in any ancestor (stops at closest
- *    match) :
- *     "selector": ".nav-tabs.closest(section)"
- *   3. Going up then down the DOM tree :
- *     "selector": ".nav-tabs.closest(section).find(.something)"
- *
- * TODO evaluate alternative to provide an array of selectors to deal with cases
- * where we need to build a single component out of multiple elements that do
- * not share a "not too distant" common ancestor.
- *
- * @returns {boolean} carry on or stops the recursive extraction process.
- */
-const preprocessExtractor = (o) => {
-  const { config, parentExtractor } = o
-
-  // Assign an "ancestor chain" string to the config. It will we used for
-  // easier processing during the second pass for nested components extraction.
-  // @see run()
-  let ancestors = []
-  let ancestorsChain = ''
-
-  if (parentExtractor) {
-    config.parent = parentExtractor
-    ancestors = getExtractorAncestors(config)
-    ancestorsChain = ancestors.map(e => e.as).join(' <- ') + ' <- '
-
-    // Also assign a scope for current config, and prepend selector for
-    // ensuring correct nesting during recusrive calls.
-    // if (!('scope' in config)) {
-    // console.log('-- there was already a scope on this config :')
-    // console.log('  ' + config.scope)
-    config.scope = parentExtractor.selector
-    config.selector = `${parentExtractor.selector} ${config.selector}`
-    // }
-  }
-
-  config.depth = ancestors.length
-  config.ancestors = ancestors
-  config.ancestorsChain = ancestorsChain + config.as
-
-  // Impose a depth limit, otherwise there would be inevitable infinite loops
-  // when components include other components.
-  // TODO this does not prevent memory leaks when trying to extract instances of
-  // a component inside itself. See below.
-  if (config.depth > this.main.getSetting('maxExtractionNestingDepth')) {
-    return false
-  }
-  // TODO find out why the fact of looking for a component instance inside
-  // itself leads to memory leak, despite the limit on maximum depth. See above.
-  if (ancestorsChain.includes(` <- ${config.as} <- `)) {
-    // Debug.
-    // console.log('')
-    // console.log(`  Forbid to look for instances of a component inside itself (${config.as} in '${ancestorsChain}')`)
-    // console.log('')
-    return false
-  }
-  // TODO (archive) memory leak tracking failed attempt.
-  // if (config.ancestorsChain.length) {
-  //   console.log(`  check ${config.ancestorsChain} in this.pageWorker.componentsExtracted ...`)
-  //   if (this.pageWorker.componentsExtracted.includes(config.ancestorsChain)) {
-  //     // Debug.
-  //     console.log(`  abort due to already processed ${config.ancestorsChain}`)
-  //     return false
-  //   }
-  //   this.pageWorker.componentsExtracted.push(config.ancestorsChain)
-  // }
-
-  // Call any custom 'preprocess' implementations.
-  if ('preprocess' in config) {
-    this.main.emit(config.preprocess, o)
-  }
-
-  // Debug.
-  // const debugIndent = '  '.repeat(config.depth)
-  // console.log(`${debugIndent}depth ${config.depth} : ${config.ancestorsChain}`)
-  // console.log(`${debugIndent}  ( ${config.selector} )`)
-
-  // TODO [wip] next iteration :
-  // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
-  // classes).
-  // if (this.main.getSetting('addDomQueryHelper')) {
-  // }
-
-  return true
-}
-
-/**
- * Returns an array of extractors that represents the "nesting chain".
- *
- * @param {object} config
- */
-const getExtractorAncestors = (config) => {
-  const ancestors = []
-  while (config.parent) {
-    ancestors.push(config.parent)
-    config = config.parent
-  }
-  return ancestors.reverse()
 }
 
 /**
@@ -725,7 +512,7 @@ const subItemsFieldProcess = async (o) => {
     console.log(`    subItemsFieldProcess() ${multiFieldItemProp} for ${componentExtractor.as}`)
     // console.log(`      ${componentExtractor.selector}`)
 
-    await this.step({
+    await this.process({
       config: componentExtractor,
       parentExtractor: config,
       extracted: subItem,

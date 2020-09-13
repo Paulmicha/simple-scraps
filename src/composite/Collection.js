@@ -1,7 +1,9 @@
 const Iterator = require('./Iterator')
 
 /**
- * Composite store.
+ * Composite store containing extraction steps.
+ *
+ * @see src/composite/Step.js
  */
 class Collection {
   constructor () {
