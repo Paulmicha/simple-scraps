@@ -2,8 +2,6 @@ const Iterator = require('./Iterator')
 
 /**
  * Composite store.
- *
- * TODO (wip)
  */
 class Collection {
   constructor () {

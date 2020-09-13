@@ -54,7 +54,7 @@ test.serial('1. Extract a single string (plain text + HTML markup)', async t => 
   await scraps.run()
 })
 
-/* test.serial('2. Extract a simple component', async t => {
+test.serial('2. Extract a simple component', async t => {
   const scraps = new SimpleScraps({
     settings: {
       crawlDelay: false
@@ -97,7 +97,7 @@ test.serial('1. Extract a single string (plain text + HTML markup)', async t => 
   })
 
   await scraps.run()
-}) */
+})
 
 /* test.serial('3. Extract nested components', async t => {
   const scraps = new SimpleScraps(nestedComponentsConfig)

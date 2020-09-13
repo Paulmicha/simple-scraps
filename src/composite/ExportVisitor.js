@@ -13,6 +13,7 @@ class ExportVisitor {
 
   visitContainer (container) {
     // TODO (wip)
+    console.log(`TODO (wip) export ${container}`)
   }
 }
 

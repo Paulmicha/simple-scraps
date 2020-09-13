@@ -8,8 +8,7 @@ const Leaf = require('./composite/Leaf')
 /**
  * Defines the process of extracting a structured object from a page.
  *
- * Loosely inspired by the design patterns Composite, Chain of Responsability,
- * and Iterator.
+ * Loosely inspired by the design patterns Composite, Iterator, and Visitor.
  *
  * TODO (wip) reorganization in progress
  */
@@ -26,18 +25,24 @@ class Extractor {
     // Set all defined extraction config that match current destination, unless
     // directly specified in the op (for cases where a single URL is "hardcoded"
     // in the entry point).
-    this.entityExtractionConfigs = []
+    this.rootExtractionConfigs = []
     if ('extract' in op) {
-      this.entityExtractionConfigs = op.extract
+      this.rootExtractionConfigs = op.extract
     } else {
-      this.entityExtractionConfigs = this.mapConfig()
+      this.rootExtractionConfigs = this.mapConfig()
     }
 
     // Set recursive extraction configs (i.e. 'components' by default).
-    this.recursiveExtractionConfigs = []
+    this.nestedExtractionConfigs = []
     this.main.getSetting('extractionContainerTypes').map(lookup => {
-      this.recursiveExtractionConfigs = this.recursiveExtractionConfigs.concat(this.mapConfig(lookup))
+      this.nestedExtractionConfigs = this.nestedExtractionConfigs.concat(this.mapConfig(lookup))
     })
+
+    // Make recursive lookups conditional.
+    this.isRecursive = false
+    if (this.nestedExtractionConfigs.length > 0) {
+      this.isRecursive = true
+    }
 
     // The extraction process uses a composite tree collection to store a
     // representation of all the selectors to run and the extraction result.
@@ -48,7 +53,7 @@ class Extractor {
     // document itself. Either we have nested components configs which require
     // recursive lookups, or we simply extract 1 or more fields of the same
     // root entity.
-    if (this.recursiveExtractionConfigs.length) {
+    if (this.isRecursive) {
       this.rootElement = new Container('')
     } else {
       this.rootElement = new Leaf('')
@@ -160,7 +165,11 @@ class Extractor {
   }
 
   /**
-   * Populates the selectors collection based on extraction configs.
+   * TODO (wip) refactor to use a CollectionItem class (name TBD) instead that
+   * would bind together the config with the components and related
+   * implementations.
+   *
+   * Populates the composite collection based on extraction configs.
    *
    * We need to obtain instances of composite Leaf and Container classes to
    * represent what will be extracted :
@@ -170,10 +179,16 @@ class Extractor {
    *   3. Nested components as field or property value (either of the page being
    *     extracted or of one of its components)
    */
-  init () {
-    for (let i = 0; i < this.entityExtractionConfigs.length; i++) {
-      const config = this.entityExtractionConfigs[i]
+  init (configs, parent, nestingLevel) {
+    if (!nestingLevel) {
+      nestingLevel = 0
+    }
+
+    for (let i = 0; i < configs.length; i++) {
+      const config = { ...configs[i] }
       const isContainer = this.isContainer(config)
+
+      config.parent = parent
 
       // If this extraction config has multiple sub-extraction configs, it must
       // be represented by a single composite instance having multiple fields or
@@ -193,7 +208,7 @@ class Extractor {
           subExtractionConfig.component = config.component
 
           // Any field or property of this group can contain nested components.
-          if (this.recursiveExtractionConfigs.length) {
+          if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
             this.setNestedExtractionConfig(subExtractionConfig, config)
           }
 
@@ -201,11 +216,13 @@ class Extractor {
         })
       } else {
         // Otherwise, we're dealing with individual fields or properties of the
-        // main entity being extracted (i.e. at the root of the tree).
-        config.component = this.rootElement
+        // main entity being extracted (i.e. at the root of the tree) or, if
+        // called in recursive components lookup, of the component representing
+        // what would be extracted if a match exists at this nesting depth.
+        config.component = parent.component
 
         // A single field can still contain nested components.
-        if (this.recursiveExtractionConfigs.length) {
+        if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
           this.setNestedExtractionConfig(config)
         }
 
@@ -218,7 +235,7 @@ class Extractor {
    * Determines if current extraction config corresponds to a composite
    * container or leaf.
    *
-   * @param {Object} config extraction config (selector collection item)
+   * @param {Object} config extraction config
    */
   isContainer (config) {
     if (Array.isArray(config.extract)) {
@@ -229,34 +246,9 @@ class Extractor {
         }
       }
     } else {
-      // Debug.
-      console.log(`extractionContainerTypes = ${this.main.getSetting('extractionContainerTypes')}`)
-      console.log(`  contains ${config.extract} ?`)
-      console.log(`  -> ${this.main.getSetting('extractionContainerTypes').includes(config.extract)}`)
-
       return this.main.getSetting('extractionContainerTypes').includes(config.extract)
     }
     return false
-  }
-
-  setAncestorsChain () {
-    this.iterator.cycle(config => {
-      config.ancestors = this.getAncestors(config)
-    })
-  }
-
-  /**
-   * Returns an array of extraction configs that represents the "nesting chain".
-   *
-   * @param {object} config
-   */
-  getAncestors (config) {
-    const ancestors = []
-    while (config.parent) {
-      ancestors.push(config.parent)
-      config = config.parent
-    }
-    return ancestors.reverse()
   }
 
   /**
@@ -268,48 +260,33 @@ class Extractor {
    * selectors - i.e. prefixed with ancestors selectors.
    */
   setNestedExtractionConfig (config, parentConfig) {
-    if (!Array.isArray(config.extract) &&
-      this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
-      this.addRecursiveExtractionConfigs(config, parentConfig)
-    } else {
+    if (Array.isArray(config.extract)) {
       config.extract.forEach(subExtractionConfig =>
         this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
         this.setNestedExtractionConfig(subExtractionConfig, config)
       )
-    }
-  }
+    } else if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
+      const nestingLevel = this.getAncestors(config).length
 
-  /**
-   * TODO (wip) Adds nested extraction config to the selectors collection.
-   *
-   * @param {Object} config
-   * @param {Object} parentConfig
-   */
-  addRecursiveExtractionConfigs (config, parentConfig) {
-    this.recursiveExtractionConfigs.forEach(recursiveExtractionConfig => {
-      const subExtractionConfig = { ...recursiveExtractionConfig }
-
-      subExtractionConfig.nestedIn = config
-      subExtractionConfig.scope = config.selector
-
-      if (parentConfig) {
-        subExtractionConfig.parentConfig = parentConfig
-        subExtractionConfig.scope = `${parentConfig.selector} ${config.selector}`
+      if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
+        this.init(this.nestedExtractionConfigs, config, nestingLevel)
       }
-
-      this.tree.add(subExtractionConfig)
-    })
+    }
   }
 
   /**
    * TODO (wip) Returns the final resulting object.
    */
   async run () {
-    // 1. Populate the selectors collection based on extraction configs.
-    this.init()
+    // 1. Populate the composite collection based on extraction configs.
+    // Start with root configs on root element then recurse.
+    this.init(this.rootExtractionConfigs, { component: this.rootElement })
 
     // 2. TODO (wip) Sort the extraction steps to start from deepest levels ?
-    this.setAncestorsChain()
+    // if (this.isRecursive) {
+    //   this.setAncestorsChain()
+    // }
+    this.iterator.cycle(config => this.preprocess(config))
 
     // Debug.
     // console.log(`Got ${this.tree.count()} selectors to run.`)
@@ -338,6 +315,94 @@ class Extractor {
     return this.result
   }
 
+  // setAncestorsChain () {
+  //   this.iterator.cycle(config => {
+  //     config.ancestors = this.getAncestors(config)
+  //   })
+  // }
+
+  /**
+   * Returns an array of extraction configs that represents the "nesting chain".
+   *
+   * @param {object} config
+   */
+  getAncestors (config) {
+    const ancestors = []
+    while (config.parent) {
+      ancestors.push(config.parent)
+      config = config.parent
+    }
+    return ancestors.reverse()
+  }
+
+  /**
+   * Preprocesses extraction config before running the actual process.
+   *
+   * This facilitates scope handling, allows customizations and jQuery-like
+   * selector syntax if there is a DOM Query Helper available in browsed page(s).
+   * @see Page.addDomQueryHelper()
+   *
+   * If the config has a 'preprocess' key, its value serves as the event
+   * emitted to allow custom implementations that would prepare elements (e.g. add
+   * custom classes) to facilitate the extraction process.
+   *
+   * Examples of jQuery-like syntax :
+   *   1. Set a custom class on parent element and use it as new scope :
+   *     "selector": ".nav-tabs.parent()"
+   *   2. Idem, but using closest() to set scope in any ancestor (stops at closest
+   *    match) :
+   *     "selector": ".nav-tabs.closest(section)"
+   *   3. Going up then down the DOM tree :
+   *     "selector": ".nav-tabs.closest(section).find(.something)"
+   *
+   * @param {Object} config
+   */
+  preprocess (config) {
+    let ancestors = []
+    let ancestorsChain = ''
+
+    if (config.parent) {
+      ancestors = this.getAncestors(config)
+      ancestorsChain = ancestors.map(e => e.as).join(' <- ') + ' <- '
+
+      // Assign a scope for current config, and prepend selector for ensuring
+      // correct nesting.
+      if (config.parent.selector) {
+        config.scope = config.parent.selector
+        config.selector = `${config.parent.selector} ${config.selector}`
+      }
+
+      // TODO (wip) implement generic destination field mapping for nested
+      // extraction configs ? Using hardcoded index for now.
+      const destination = config.as.split('.')
+      if (destination.length > 2) {
+        config.fieldOverride = destination[2]
+      }
+    }
+
+    config.depth = ancestors.length
+    config.ancestors = ancestors
+    config.ancestorsChain = ancestorsChain + config.as
+
+    // Call any custom 'preprocess' implementations.
+    if ('preprocess' in config) {
+      this.main.emit(config.preprocess, config)
+    }
+
+    // Debug.
+    const debugIndent = '  '.repeat(config.depth)
+    console.log(`${debugIndent}depth ${config.depth} : ${config.ancestorsChain}`)
+    console.log(`${debugIndent}  ( ${config.selector} )`)
+    if (config.fieldOverride) {
+      console.log(`${debugIndent}  as ${config.fieldOverride}`)
+    }
+
+    // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
+    // classes).
+    // if (this.main.getSetting('addDomQueryHelper')) {
+    // }
+  }
+
   /**
    * TODO (wip) Processes an exctraction "step".
    *
@@ -352,7 +417,7 @@ class Extractor {
   async step (o) {
     // const { config, extracted, pageWorker, main, fieldOverride } = o
     // const { config, extracted, pageWorker, main, fieldOverride, debugIndent } = o
-    const { config, fieldOverride, debugIndent } = o
+    const { config, debugIndent } = o
 
     const component = config.component
 
@@ -370,9 +435,9 @@ class Extractor {
     // By default, the field (or property) that is being extracted is the 2nd part
     // of the "as" key, but it needs to be overridable for nested components.
     const destination = config.as.split('.')
-    let field = fieldOverride
-    if (!field) {
-      field = destination[1]
+    let field = destination[1]
+    if (config.fieldOverride) {
+      field = config.fieldOverride
     }
 
     // Debug.
@@ -424,10 +489,14 @@ class Extractor {
           this.main.getSetting('minifyExtractedHtml')
         ))
         break
+
+      // TODO (wip) refactor in progress.
       // TODO implement an extraction for attribute(s).
       case 'element':
         await elementFieldProcess({ config, component, field })
         break
+
+      // TODO (wip) refactor in progress : need to make recursive calls to step()
       // In order to support nested components extraction, we need to start from
       // the "deepest" nesting levels to avoid matching the same elements multiple
       // times. This is achieved by storing 'components' fields aside for later
@@ -435,7 +504,10 @@ class Extractor {
       // extraction and mark extracted components to avoid potential duplicates.
       // @see runrunSecondPass()
       case 'components': {
-        await componentsFieldProcess({ config, component, field })
+        // Debug.
+        console.log(config)
+
+        // await componentsFieldProcess({ config, component, field })
 
         // TODO other refactor in progress.
         /*
