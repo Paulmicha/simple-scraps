@@ -1,13 +1,18 @@
+const Iterator = require('./Iterator')
 
 /**
  * Composite store.
  *
- * There is nothing fundamentally different than a simple array here, but for
- * clarity's sake, this class explicitly signals the design pattern used.
+ * TODO (wip)
  */
 class Collection {
   constructor () {
     this.items = []
+  }
+
+  createIterator () {
+    this.iterator = new Iterator(this)
+    return this.iterator
   }
 
   add (item) {
@@ -18,11 +23,18 @@ class Collection {
     return this.items.length
   }
 
-  cycle (iterator, callback) {
-    while (iterator.hasMore()) {
-      callback(iterator.next())
+  cycle (callback) {
+    while (this.iterator.hasMore()) {
+      callback(this.iterator.next())
     }
-    iterator.reset()
+    this.iterator.reset()
+  }
+
+  async cycleAsync (callback) {
+    while (this.iterator.hasMore()) {
+      await callback(this.iterator.next())
+    }
+    this.iterator.reset()
   }
 }
 

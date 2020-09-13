@@ -9,10 +9,19 @@ class Component {
   constructor (selector, container) {
     this.selector = selector
     this.container = container
+    this.extracted = {}
   }
 
   getParent () {
     return this.container
+  }
+
+  setField (prop, value) {
+    this.extracted[prop] = value
+  }
+
+  getExtractionResult () {
+    return this.extracted
   }
 }
 
