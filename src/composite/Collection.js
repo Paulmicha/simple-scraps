@@ -11,8 +11,7 @@ class Collection {
   }
 
   createIterator () {
-    this.iterator = new Iterator(this)
-    return this.iterator
+    return new Iterator(this)
   }
 
   add (item) {
@@ -21,20 +20,6 @@ class Collection {
 
   count () {
     return this.items.length
-  }
-
-  cycle (callback) {
-    while (this.iterator.hasMore()) {
-      callback(this.iterator.next())
-    }
-    this.iterator.reset()
-  }
-
-  async cycleAsync (callback) {
-    while (this.iterator.hasMore()) {
-      await callback(this.iterator.next())
-    }
-    this.iterator.reset()
   }
 }
 

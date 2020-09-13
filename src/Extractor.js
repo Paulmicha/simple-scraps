@@ -2,6 +2,7 @@ const dom = require('./utils/dom')
 const Collection = require('./composite/Collection')
 // const Iterator = require('./composite/Iterator')
 const Container = require('./composite/Container')
+const ExportVisitor = require('./composite/ExportVisitor')
 const Leaf = require('./composite/Leaf')
 
 /**
@@ -44,8 +45,14 @@ class Extractor {
     this.iterator = this.tree.createIterator()
 
     // Finally, the composite tree has a single shared "root" : the HTML
-    // document itself (for Leaf instances extracted from <body>).
-    this.rootElement = new Container('')
+    // document itself. Either we have nested components configs which require
+    // recursive lookups, or we simply extract 1 or more fields of the same
+    // root entity.
+    if (this.recursiveExtractionConfigs.length) {
+      this.rootElement = new Container('')
+    } else {
+      this.rootElement = new Leaf('')
+    }
   }
 
   /**
@@ -233,7 +240,7 @@ class Extractor {
   }
 
   setAncestorsChain () {
-    this.tree.cycle(config => {
+    this.iterator.cycle(config => {
       config.ancestors = this.getAncestors(config)
     })
   }
@@ -305,36 +312,28 @@ class Extractor {
     this.setAncestorsChain()
 
     // Debug.
-    console.log(`Got ${this.tree.count()} selectors to run.`)
-    this.tree.cycle(config => {
-      console.log('tree item :')
-      console.log(config)
-    })
+    // console.log(`Got ${this.tree.count()} selectors to run.`)
+    // this.iterator.cycle(config => {
+    //   console.log('tree item :')
+    //   console.log(config)
+    // })
 
     // 3. Run extraction steps (avoiding duplicates) and populate the
     // "extracted" collection.
-    await this.tree.cycleAsync(async config => await this.step({ config }))
-    // while (this.selectorsIterator.hasMore()) {
-    //   await this.step({
-    //     config: this.selectorsIterator.next()
-    //   })
-    // }
+    await this.iterator.cycleAsync(async config => await this.step({ config }))
 
     // 4. Generate the extraction result object.
-    if (!this.recursiveExtractionConfigs.length) {
-      return this.rootElement.getExtractionResult()
+    // When no nested fields were found, we are extracting a single entity from
+    // the entire page. Otherwise, the result will need to be built recursively.
+    const exporter = new ExportVisitor()
+    switch (this.rootElement.constructor.name) {
+      case 'Leaf':
+        this.result = exporter.visitLeaf(this.rootElement)
+        break
+      case 'Container':
+        this.result = exporter.visitContainer(this.rootElement)
+        break
     }
-
-    // this.tree.cycle(config => {
-    //   // TODO [wip] "reduce" the tree to the extraction result.
-    //   console.log(config.component.getExtractionResult())
-    // })
-
-    // this.extractedCollection.cycle(this.extractedIterator, extracted => {
-    //   // Debug.
-    //   console.log('extracted:')
-    //   console.log(extracted)
-    // })
 
     return this.result
   }

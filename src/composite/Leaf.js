@@ -1,7 +1,7 @@
 const Component = require('./Component')
 
 /**
- * Composite leaf implementing chain of responsability (concrete handler).
+ * Composite leaf.
  *
  * Represents a component that has no children.
  */
@@ -10,6 +10,10 @@ class Leaf extends Component {
   // constructor (container) {
   //   super(container)
   // }
+
+  accept (visitor) {
+    visitor.visitLeaf(this)
+  }
 }
 
 module.exports = Leaf

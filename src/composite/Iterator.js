@@ -24,6 +24,20 @@ class Iterator {
   reset () {
     this.cursor = 0
   }
+
+  cycle (callback) {
+    while (this.hasMore()) {
+      callback(this.next())
+    }
+    this.reset()
+  }
+
+  async cycleAsync (callback) {
+    while (this.hasMore()) {
+      await callback(this.next())
+    }
+    this.reset()
+  }
 }
 
 module.exports = Iterator

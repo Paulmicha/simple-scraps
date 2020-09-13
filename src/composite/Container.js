@@ -1,7 +1,7 @@
 const Component = require('./Component')
 
 /**
- * Composite container implementing chain of responsability (concrete handler).
+ * Composite container.
  *
  * Represents a type of component that can contain other components.
  */
@@ -17,6 +17,10 @@ class Container extends Component {
 
   getChildren () {
     return this.children
+  }
+
+  accept (visitor) {
+    visitor.visitContainer(this)
   }
 }
 
