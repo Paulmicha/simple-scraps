@@ -265,7 +265,7 @@ class Extractor {
     //   this.setAncestorsChain()
     // }
     this.iterator.cycle(step => step.preprocess())
-    this.iterator.cycle(step => step.setDescendants(this.getDescendants(step)))
+    this.iterator.sort()
 
     // Debug.
     // console.log(`Got ${this.tree.count()} selectors to run.`)
@@ -313,16 +313,6 @@ class Extractor {
       config = config.parent
     }
     return ancestors.reverse()
-  }
-
-  /**
-   * TODO (wip) would be used for depth sorting + components process
-   * Returns an array of extraction configs that represents the "nesting chain"
-   * from current level to deepest level.
-   */
-  getDescendants (step) {
-    // const descendants = []
-    // return descendants
   }
 
   /**

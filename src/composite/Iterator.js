@@ -1,6 +1,7 @@
+const { compare } = require('specificity')
 
 /**
- * Generic utility to traverse collections (trees).
+ * Traverses and sorts (tree) Collection of Step instances.
  */
 class Iterator {
   constructor (collection) {
@@ -37,6 +38,30 @@ class Iterator {
       await callback(this.next())
     }
     this.reset()
+  }
+
+  /**
+   * Sorts collection items (= Step instances) by most deeply nested, then CSS
+   * selectors specificity in case of equality.
+   */
+  sort () {
+    if (this.collection.items.length <= 1) {
+      return
+    }
+    this.collection.items.sort((a, b) => {
+      // 'a' is less specific than 'b' (= less deeply nested).
+      if (a.depth < b.depth) {
+        return -1
+      }
+      // 'a' is more specific than 'b' (= nested deeper).
+      if (a.depth > b.depth) {
+        return 1
+      }
+      // Equality leads to CSS selectors specificity comparison.
+      if (a.depth === b.depth) {
+        return compare(a.selector, b.selector)
+      }
+    })
   }
 }
 

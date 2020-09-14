@@ -1,10 +1,13 @@
 
 /**
- * Composite collection item handling extraction configs and components.
+ * Composite collection item wrapping extraction configs and components.
  *
  * This is necessary because multiple extraction steps may run for extracting
  * a single component (which can have multiple fields - each requiring a
  * distinct selector, thus a distinct extraction step).
+ *
+ * Each instance of this class represents a single extraction step which will
+ * be exectued in Extractor.process() method.
  */
 class Step {
   constructor (config, main) {
@@ -14,8 +17,13 @@ class Step {
     this.as = config.as
     this.emit = config.emit
     this.parent = config.parent
-    this.ancestors = config.ancestors
     this.main = main
+
+    // This will be reset in Extractor.setNestedExtractionConfig().
+    this.ancestors = config.ancestors
+
+    // This will be reset in this.preprocess().
+    this.depth = 0
   }
 
   getParent () {
