@@ -25,6 +25,18 @@ class Step extends Iterable {
     this.ancestors = config.ancestors
   }
 
+  setDepth (depth) {
+    if (depth) {
+      this.depth = depth
+      return
+    }
+    if (this.ancestors.length) {
+      this.depth = this.ancestors.length - 1
+      return
+    }
+    this.depth = 0
+  }
+
   getComponent () {
     return this.component
   }

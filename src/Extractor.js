@@ -66,6 +66,12 @@ class Extractor {
   }
 
   /**
+   * TODO (wip) binds ancestors setting with Iterable instance creation.
+   */
+  iterableFactory () {
+  }
+
+  /**
    * Returns extraction definitions from main config.
    *
    * @param {string} lookup (optional) : specifies which configuration to get.
@@ -203,6 +209,7 @@ class Extractor {
         } else {
           config.component = new Leaf(config.selector)
         }
+        config.component.setAncestors(this.getAncestors(config.component))
         this.extracted.add(config.component)
 
         config.extract.map(subExtractionConfig => {
@@ -225,6 +232,7 @@ class Extractor {
         // called in recursive components lookup, of the component representing
         // what would be extracted if a match exists at this nesting depth.
         config.component = parent.component
+        config.component.setAncestors(this.getAncestors(config.component))
 
         // A single field can still contain nested components.
         if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
@@ -264,6 +272,15 @@ class Extractor {
    * recursive processing. In this case, we reference the parent extraction
    * config for each nesting depth level in order to generate scoped
    * selectors - i.e. prefixed with ancestors selectors.
+   *
+   * @example
+   *   // This extraction config sample represents what would trigger the
+   *   // recursive calls to this.init() - if 'components' is part of the
+   *   // 'extractionContainerTypes' setting, which is the case by default :
+   *   {
+   *     "extract": "components",
+   *     "as": "entity.content"
+   *   }
    */
   setNestedExtractionConfig (config) {
     if (Array.isArray(config.extract)) {
@@ -272,11 +289,13 @@ class Extractor {
         this.setNestedExtractionConfig(subExtractionConfig, config)
       )
     } else if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
-      const ancestors = this.getAncestors(config)
-      const nestingLevel = ancestors.length
-      config.ancestors = ancestors
+      const nestingLevel = this.getConfigNestingLevel(config)
 
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
+        // Debug.
+        console.log(`recursive call to init() at nestingLevel ${nestingLevel} :`)
+        console.log(this.nestedExtractionConfigs)
+
         this.init(this.nestedExtractionConfigs, config, nestingLevel)
       }
     }
@@ -298,11 +317,10 @@ class Extractor {
     this.iterator.sort()
 
     // Debug.
-    // console.log(`Got ${this.steps.count()} selectors to run.`)
-    // this.iterator.cycle(config => {
-    //   console.log('tree item :')
-    //   console.log(config)
-    // })
+    console.log(`Got ${this.steps.count()} selectors to run.`)
+    this.iterator.cycle(step => {
+      console.log(`  depth ${step.getDepth()} (extract ${step.extract} as ${step.as}) : ${step.selector}`)
+    })
 
     // 3. Run extraction steps (avoiding duplicates) and populate the
     // "extracted" collection.
@@ -324,24 +342,39 @@ class Extractor {
     return this.result
   }
 
-  // setAncestorsChain () {
-  //   this.iterator.cycle(config => {
-  //     config.ancestors = this.getAncestors(config)
-  //   })
-  // }
+  /**
+   * Returns the "nesting level" of given extraction config object.
+   *
+   * @param {Object} config A single extraction config object.
+   */
+  getConfigNestingLevel (config) {
+    const ancestors = this.getAncestors(config)
+    if (ancestors.length) {
+      return ancestors.length - 1
+    }
+    return 0
+  }
 
   /**
-   * Returns an array of extraction configs that represents the "nesting chain"
-   * from current level to root.
+   * Returns an array of objects that represents a "nesting chain" from current
+   * depth level to the root (depth 0).
    *
-   * @param {object} config
+   * @param {Object} object Any object with a field optionally containing its
+   *   parent object.
+   * @param {string} parentField (optional) The field or property containing the
+   *   parent object value. Defaults to 'parent'.
    */
-  getAncestors (config) {
+  getAncestors (object, parentField) {
     const ancestors = []
-    while (config.parent) {
-      ancestors.push(config.parent)
-      config = config.parent
+    if (!parentField) {
+      parentField = 'parent'
     }
+
+    while (object[parentField]) {
+      ancestors.push(object[parentField])
+      object = object[parentField]
+    }
+
     return ancestors.reverse()
   }
 
