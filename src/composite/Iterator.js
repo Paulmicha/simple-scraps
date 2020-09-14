@@ -29,14 +29,14 @@ class Iterator {
     this.cursor = 0
   }
 
-  cycle (callback) {
+  traverse (callback) {
     while (this.hasMore()) {
       callback(this.next())
     }
     this.reset()
   }
 
-  async cycleAsync (callback) {
+  async traverseAsync (callback) {
     while (this.hasMore()) {
       await callback(this.next())
     }
@@ -52,6 +52,10 @@ class Iterator {
       return
     }
     this.collection.items.sort((a, b) => {
+      // Debug.
+      console.log(`a.depth = ${a.getDepth()}, b.depth = ${b.getDepth()}`)
+      console.log(`a.ancestorsChain = '${a.ancestorsChain}', b.ancestorsChain = '${b.ancestorsChain}'`)
+
       // 'a' is less specific than 'b' (= less deeply nested).
       if (a.getDepth() < b.getDepth()) {
         return -1
@@ -60,6 +64,10 @@ class Iterator {
       if (a.getDepth() > b.getDepth()) {
         return 1
       }
+
+      // Debug.
+      console.log(`compare(${a.getScope()}, ${b.getScope()})`)
+
       // Fallback : equality leads to CSS selectors specificity comparison.
       return compare(a.getScope(), b.getScope())
     })

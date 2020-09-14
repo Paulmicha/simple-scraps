@@ -55,7 +55,7 @@ class Extractor {
     // document itself. Either we have nested components configs which require
     // recursive lookups, or we simply extract 1 or more fields of the same
     // root entity.
-    this.rootComponent = this.iterableFactory({ type: 'rootComponent' })
+    this.rootComponent = this.iterableFactory({ type: 'rootComponent', scope: '' })
   }
 
   /**
@@ -163,26 +163,45 @@ class Extractor {
   }
 
   /**
-   * Binds ancestors setting with Iterable instance creation.
+   * Binds Iterable composite instances creation and scoping.
    */
   iterableFactory (spec) {
     const { type, scope, config } = spec
     let instance
-    let instanceParentField = 'parent'
+    let instanceParentField
+
+    // Debug.
+    // console.log(`iterableFactory() : ${JSON.stringify(spec)}`)
+    console.log(`iterableFactory() : ${Object.keys(spec)} (type = ${type})`)
+    if (config) {
+      console.log(`  '${config.extract}' as ${config.as}`)
+      if (config.parent && config.parent.as) {
+        console.log(`    via '${config.parent.extract}' as ${config.parent.as}`)
+      }
+    }
 
     switch (type) {
       case 'step':
+        instanceParentField = 'parent'
+
         instance = new Step(config, this.main)
+
         this.steps.add(instance)
         break
 
       case 'component':
         instanceParentField = 'container'
+
         if (this.isContainer(config)) {
-          instance = new Container(config.selector)
+          instance = new Container(config)
         } else {
-          instance = new Leaf(config.selector)
+          instance = new Leaf(config)
         }
+
+        if (config.component) {
+          instance.setContainer(config.component)
+        }
+
         this.extracted.add(instance)
         break
 
@@ -190,11 +209,13 @@ class Extractor {
       // that will be shared by all extracted components).
       case 'rootComponent':
         instanceParentField = 'container'
+
         if (this.isRecursive) {
-          instance = new Container('')
+          instance = new Container()
         } else {
-          instance = new Leaf('')
+          instance = new Leaf()
         }
+
         this.extracted.add(instance)
         break
     }
@@ -228,6 +249,37 @@ class Extractor {
   }
 
   /**
+   * Returns an array of objects that represents a "nesting chain" from current
+   * depth level to the root (depth 0).
+   *
+   * @param {Object} object Any object with a field optionally containing its
+   *   parent object.
+   * @param {string} parentField (optional) The field or property containing the
+   *   parent object value. Defaults to 'parent'.
+   */
+  getAncestors (object, parentField) {
+    const ancestors = []
+    if (!parentField) {
+      parentField = 'parent'
+    }
+
+    // Debug.
+    // console.log(`getAncestors(object, '${parentField}') for ${object.constructor.name}`)
+    // console.log(`  keys: ${Object.keys(object)}`)
+    // console.log(`  object[parentField] = ${JSON.stringify(object[parentField])}`)
+
+    while (object[parentField]) {
+      ancestors.push(object[parentField])
+      object = object[parentField]
+    }
+
+    // Debug.
+    // console.log(ancestors.map(a => JSON.stringify(a)))
+
+    return ancestors.reverse()
+  }
+
+  /**
    * Populates the composite collection based on extraction configs.
    *
    * Step class instances are the Collection items which are traversable via
@@ -258,6 +310,7 @@ class Extractor {
       if (Array.isArray(config.extract)) {
         config.component = this.iterableFactory({
           type: 'component',
+          scope: parent.selector,
           config
         })
 
@@ -290,7 +343,6 @@ class Extractor {
           this.setNestedExtractionConfig(config)
         }
 
-        // this.steps.add(new Step(config, this.main))
         this.iterableFactory({
           type: 'step',
           config
@@ -349,29 +401,6 @@ class Extractor {
   }
 
   /**
-   * Returns an array of objects that represents a "nesting chain" from current
-   * depth level to the root (depth 0).
-   *
-   * @param {Object} object Any object with a field optionally containing its
-   *   parent object.
-   * @param {string} parentField (optional) The field or property containing the
-   *   parent object value. Defaults to 'parent'.
-   */
-  getAncestors (object, parentField) {
-    const ancestors = []
-    if (!parentField) {
-      parentField = 'parent'
-    }
-
-    while (object[parentField]) {
-      ancestors.push(object[parentField])
-      object = object[parentField]
-    }
-
-    return ancestors.reverse()
-  }
-
-  /**
    * Returns the final resulting object.
    */
   async run () {
@@ -380,18 +409,19 @@ class Extractor {
     // @see setNestedExtractionConfig()
     this.init(this.rootExtractionConfigs, { component: this.rootComponent })
 
+    // Debug.
+    console.log(`Got ${this.steps.count()} selectors to run.`)
+
+    // Debug.
+    console.log('Before sorting :')
+    this.iterator.traverse(step => step.locate())
+
     // 2. TODO (wip) Sort the extraction steps to start from deepest levels ?
     this.iterator.sort()
 
     // Debug.
-    console.log(`Got ${this.steps.count()} selectors to run.`)
-    this.iterator.cycle(step => {
-      // console.log(`  depth ${step.getDepth()} (extract ${step.extract} as ${step.as}) : ${step.selector}`)
-      const depth = step.getDepth()
-      const debugIndent = '  '.repeat(depth)
-      console.log(`${debugIndent}depth ${depth} : ${step.ancestorsChain}`)
-      console.log(`${debugIndent}  ( ${step.selector} )`)
-    })
+    console.log('After sorting :')
+    this.iterator.traverse(step => step.locate())
 
     // 3. Execute the actual extraction using the pageWorker.
     // TODO (wip) Run all (optional) custom processes before extraction ?
@@ -400,12 +430,16 @@ class Extractor {
     // If the config has a 'preprocess' key, its value serves as the event
     // emitted to allow custom implementations that would prepare elements (e.g.
     // add custom classes) to facilitate the extraction process.
-    await this.iterator.cycleAsync(async step => {
+    await this.iterator.traverseAsync(async step => {
       if ('emit' in step) {
         await this.main.emit(step.emit, step, this)
       }
     })
-    await this.iterator.cycleAsync(async step => await this.process(step))
+    await this.iterator.traverseAsync(async step => await this.process(step))
+
+    // Debug.
+    console.log('Extracted components :')
+    this.extractedIterator.traverse(component => component.locate())
 
     // 4. Generate the extraction result object.
     // When no nested fields were found, we are extracting a single entity from

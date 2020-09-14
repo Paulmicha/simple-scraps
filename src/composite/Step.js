@@ -12,33 +12,16 @@ const Iterable = require('./Iterable')
  */
 class Step extends Iterable {
   constructor (config, main) {
-    super()
-    this.component = config.component
-    this.selector = config.selector
-    this.extract = config.extract
-    this.as = config.as
-    this.emit = config.emit
+    super(config)
     this.parent = config.parent
+    this.component = config.component
+    this.emit = config.emit
     this.main = main
-
-    // This will be reset in Extractor.setNestedExtractionConfig().
-    this.ancestors = config.ancestors
   }
 
-  /**
-   * Overrides base class method to add convenience debug markers.
-   *
-   * @param {array} ancestors
-   */
-  setAncestors (ancestors) {
-    this.ancestors = ancestors
-
-    this.ancestorsChain = ''
-    if (this.parent) {
-      this.ancestorsChain = this.ancestors.map(e => e.as).join(' <- ') + ' <- '
-    }
-    this.ancestorsChain += this.as
-  }
+  // setParent (parent) {
+  //   this.parent = parent
+  // }
 
   /**
    * Overrides base class method to scope and customize lookup selectors.
@@ -75,16 +58,16 @@ class Step extends Iterable {
     }
   }
 
-  getComponent () {
-    return this.component
-  }
-
   getField () {
     const destination = this.as.split('.')
     if (destination.length > 2) {
       return destination[2]
     }
     return destination[1]
+  }
+
+  getComponent () {
+    return this.component
   }
 }
 
