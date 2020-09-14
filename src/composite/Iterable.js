@@ -35,7 +35,8 @@ class Iterable {
     }
     this.ancestorsChain += this.as
 
-    this.setDepth()
+    this.setDepth()// Debug.
+    console.log(`  result : ${this.getDepth()}`)
   }
 
   /**
@@ -46,14 +47,14 @@ class Iterable {
    */
   setDepth (depth) {
     // Debug.
-    console.log(`setDepth() / this.ancestorsChain = '${this.ancestorsChain}'`)
+    console.log(`setDepth(${depth}) / this.ancestorsChain = '${this.ancestorsChain}'`)
 
     if (depth) {
       this.depth = depth
       return
     }
-    if (this.ancestors.length) {
-      this.depth = this.ancestors.length - 1
+    if (this.ancestors.length && this.ancestors.length > 2) {
+      this.depth = this.ancestors.length - 2
       return
     }
     this.depth = 0

@@ -323,7 +323,7 @@ class Extractor {
 
           // Any field or property of this group can contain nested components.
           if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-            this.setNestedExtractionConfig(subExtractionConfig)
+            this.nestExtractionConfig(subExtractionConfig)
           }
 
           this.iterableFactory({
@@ -340,7 +340,7 @@ class Extractor {
 
         // A single field can still contain nested components.
         if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-          this.setNestedExtractionConfig(config)
+          this.nestExtractionConfig(config)
         }
 
         this.iterableFactory({
@@ -368,11 +368,11 @@ class Extractor {
    *     "as": "entity.content"
    *   }
    */
-  setNestedExtractionConfig (config) {
+  nestExtractionConfig (config) {
     if (Array.isArray(config.extract)) {
       config.extract.forEach(subExtractionConfig =>
         this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
-        this.setNestedExtractionConfig(subExtractionConfig, config)
+        this.nestExtractionConfig(subExtractionConfig, config)
       )
     } else if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
       const nestingLevel = this.getConfigNestingLevel(config)
@@ -406,8 +406,14 @@ class Extractor {
   async run () {
     // 1. Populate the composite collection based on extraction configs.
     // Start with root configs on root element, then recurse (if needed).
-    // @see setNestedExtractionConfig()
-    this.init(this.rootExtractionConfigs, { component: this.rootComponent })
+    // @see nestExtractionConfig()
+    this.init(this.rootExtractionConfigs, {
+      component: this.rootComponent,
+      selector: ':root'
+    })
+
+    // TODO (wip) implement "reducer" of extraction steps for every non-existing
+    // scopes in the page.
 
     // Debug.
     console.log(`Got ${this.steps.count()} selectors to run.`)

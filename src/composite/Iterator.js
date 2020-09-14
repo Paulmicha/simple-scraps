@@ -53,23 +53,23 @@ class Iterator {
     }
     this.collection.items.sort((a, b) => {
       // Debug.
-      console.log(`a.depth = ${a.getDepth()}, b.depth = ${b.getDepth()}`)
-      console.log(`a.ancestorsChain = '${a.ancestorsChain}', b.ancestorsChain = '${b.ancestorsChain}'`)
+      // console.log(`a.depth = ${a.getDepth()}, b.depth = ${b.getDepth()}`)
+      // console.log(`a.ancestorsChain = '${a.ancestorsChain}', b.ancestorsChain = '${b.ancestorsChain}'`)
 
       // 'a' is less specific than 'b' (= less deeply nested).
       if (a.getDepth() < b.getDepth()) {
-        return -1
+        return 1
       }
       // 'a' is more specific than 'b' (= nested deeper).
       if (a.getDepth() > b.getDepth()) {
-        return 1
+        return -1
       }
 
       // Debug.
-      console.log(`compare(${a.getScope()}, ${b.getScope()})`)
+      // console.log(`compare(${a.getScope()}, ${b.getScope()}) = ${compare(a.getScope(), b.getScope())}`)
 
       // Fallback : equality leads to CSS selectors specificity comparison.
-      return compare(a.getScope(), b.getScope())
+      return compare(a.getScope(), b.getScope()) * -1
     })
   }
 }
