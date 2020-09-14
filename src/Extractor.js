@@ -249,6 +249,9 @@ class Extractor {
         }
       }
     } else {
+      // Debug
+      console.log(`isContainer(${config.extract}) ? -> ${this.main.getSetting('extractionContainerTypes').includes(config.extract)}`)
+
       return this.main.getSetting('extractionContainerTypes').includes(config.extract)
     }
     return false
@@ -421,9 +424,15 @@ class Extractor {
       // processing during a second extraction pass, where we'll be able to scope
       // extraction and mark extracted components to avoid potential duplicates.
       // @see runrunSecondPass()
-      case 'components': {
+      case 'components':
+        component.setField(field, {
+          c: step.as.split('.')[1],
+          props: { ...component.extracted }
+        })
+
         // Debug.
-        console.log(step)
+        // console.log('component scope = ' + step.getScope())
+        console.log(component)
 
         // await componentsFieldProcess({ config, component, field })
 
@@ -447,7 +456,6 @@ class Extractor {
         // TODO (wip)
         */
         break
-      }
     }
   }
 }
