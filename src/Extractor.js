@@ -166,7 +166,7 @@ class Extractor {
    * Binds Iterable composite instances creation and scoping.
    */
   iterableFactory (spec) {
-    const { type, scope, config } = spec
+    const { type, scope, config, container } = spec
     let instance
     let instanceParentField
 
@@ -193,6 +193,10 @@ class Extractor {
 
       case 'component':
         instanceParentField = 'container'
+
+        if (container) {
+          config.component = container
+        }
 
         if (this.isContainer(config)) {
           instance = new Container(config)
@@ -346,9 +350,11 @@ class Extractor {
         if (destination[0] === 'component') {
           config.component = this.iterableFactory({
             type: 'component',
+            container: parent.component,
+            scope: config.selector,
             config
           })
-          config.component.setContainer(parent.component)
+          parent.component.add(config.component)
         } else {
           // Otherwise, it's a field or property belonging to the page document
           // root.
