@@ -19,7 +19,7 @@ class Iterable {
    * Always set depth level to 0 if instance has a single ancestor (the page
    * document root).
    *
-   * @param {Number} depth (optional) Overrides the default process.
+   * @param {Number} depth (optional) Allows overriding this method's result.
    */
   setDepth (depth) {
     if (depth) {

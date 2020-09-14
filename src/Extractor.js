@@ -9,8 +9,6 @@ const ExportVisitor = require('./composite/ExportVisitor')
  * Defines the process of extracting a structured object from a page.
  *
  * Loosely inspired by the design patterns Composite, Iterator, and Visitor.
- *
- * TODO (wip) reorganization in progress
  */
 class Extractor {
   constructor (op, pageWorker, main) {
@@ -53,22 +51,11 @@ class Extractor {
     this.extracted = new Collection()
     this.extractedIterator = this.extracted.createIterator()
 
-    // Finally, the composite tree has a single shared "root" : the HTML
+    // Finally, all extracted components will share a single "root" : the HTML
     // document itself. Either we have nested components configs which require
     // recursive lookups, or we simply extract 1 or more fields of the same
     // root entity.
-    if (this.isRecursive) {
-      this.rootElement = new Container('')
-    } else {
-      this.rootElement = new Leaf('')
-    }
-    this.extracted.add(this.rootElement)
-  }
-
-  /**
-   * TODO (wip) binds ancestors setting with Iterable instance creation.
-   */
-  iterableFactory () {
+    this.rootComponent = this.iterableFactory({ type: 'rootComponent' })
   }
 
   /**
@@ -176,6 +163,71 @@ class Extractor {
   }
 
   /**
+   * Binds ancestors setting with Iterable instance creation.
+   */
+  iterableFactory (spec) {
+    const { type, scope, config } = spec
+    let instance
+    let instanceParentField = 'parent'
+
+    switch (type) {
+      case 'step':
+        instance = new Step(config, this.main)
+        this.steps.add(instance)
+        break
+
+      case 'component':
+        instanceParentField = 'container'
+        if (this.isContainer(config)) {
+          instance = new Container(config.selector)
+        } else {
+          instance = new Leaf(config.selector)
+        }
+        this.extracted.add(instance)
+        break
+
+      // The root component is like the <html> tag (it's the common ancestor
+      // that will be shared by all extracted components).
+      case 'rootComponent':
+        instanceParentField = 'container'
+        if (this.isRecursive) {
+          instance = new Container('')
+        } else {
+          instance = new Leaf('')
+        }
+        this.extracted.add(instance)
+        break
+    }
+
+    // All iterable objects share the following initialization steps.
+    instance.setAncestors(this.getAncestors(instance, instanceParentField))
+    instance.setScope(scope)
+
+    return instance
+  }
+
+  /**
+   * Determines if given extraction config corresponds to a composite container
+   * or leaf component.
+   */
+  isContainer (config) {
+    if (Array.isArray(config.extract)) {
+      for (let i = 0; i < config.extract.length; i++) {
+        const subConfig = config.extract[i]
+        if (this.isContainer(subConfig)) {
+          return true
+        }
+      }
+    } else {
+      // Debug
+      console.log(`isContainer(${config.extract}) ? -> ${this.main.getSetting('extractionContainerTypes').includes(config.extract)}`)
+
+      return this.main.getSetting('extractionContainerTypes').includes(config.extract)
+    }
+    return false
+  }
+
+  /**
    * Populates the composite collection based on extraction configs.
    *
    * Step class instances are the Collection items which are traversable via
@@ -204,13 +256,10 @@ class Extractor {
       // be represented by a single composite instance having 1 or more fields
       // or properties (i.e. an instance of Component -> Container or Leaf).
       if (Array.isArray(config.extract)) {
-        if (this.isContainer(config)) {
-          config.component = new Container(config.selector)
-        } else {
-          config.component = new Leaf(config.selector)
-        }
-        config.component.setAncestors(this.getAncestors(config.component))
-        this.extracted.add(config.component)
+        config.component = this.iterableFactory({
+          type: 'component',
+          config
+        })
 
         config.extract.map(subExtractionConfig => {
           subExtractionConfig.parent = config
@@ -224,7 +273,10 @@ class Extractor {
             this.setNestedExtractionConfig(subExtractionConfig)
           }
 
-          this.steps.add(new Step(subExtractionConfig, this.main))
+          this.iterableFactory({
+            type: 'step',
+            config
+          })
         })
       } else {
         // Otherwise, we're dealing with individual fields or properties of the
@@ -232,37 +284,19 @@ class Extractor {
         // called in recursive components lookup, of the component representing
         // what would be extracted if a match exists at this nesting depth.
         config.component = parent.component
-        config.component.setAncestors(this.getAncestors(config.component))
 
         // A single field can still contain nested components.
         if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
           this.setNestedExtractionConfig(config)
         }
 
-        this.steps.add(new Step(config, this.main))
+        // this.steps.add(new Step(config, this.main))
+        this.iterableFactory({
+          type: 'step',
+          config
+        })
       }
     }
-  }
-
-  /**
-   * Determines if given extraction config corresponds to a composite container
-   * or leaf component.
-   */
-  isContainer (config) {
-    if (Array.isArray(config.extract)) {
-      for (let i = 0; i < config.extract.length; i++) {
-        const subConfig = config.extract[i]
-        if (this.isContainer(subConfig)) {
-          return true
-        }
-      }
-    } else {
-      // Debug
-      console.log(`isContainer(${config.extract}) ? -> ${this.main.getSetting('extractionContainerTypes').includes(config.extract)}`)
-
-      return this.main.getSetting('extractionContainerTypes').includes(config.extract)
-    }
-    return false
   }
 
   /**
@@ -302,47 +336,6 @@ class Extractor {
   }
 
   /**
-   * TODO (wip) Returns the final resulting object.
-   */
-  async run () {
-    // 1. Populate the composite collection based on extraction configs.
-    // Start with root configs on root element then recurse.
-    this.init(this.rootExtractionConfigs, { component: this.rootElement })
-
-    // 2. TODO (wip) Sort the extraction steps to start from deepest levels ?
-    // if (this.isRecursive) {
-    //   this.setAncestorsChain()
-    // }
-    this.iterator.cycle(step => step.preprocess())
-    this.iterator.sort()
-
-    // Debug.
-    console.log(`Got ${this.steps.count()} selectors to run.`)
-    this.iterator.cycle(step => {
-      console.log(`  depth ${step.getDepth()} (extract ${step.extract} as ${step.as}) : ${step.selector}`)
-    })
-
-    // 3. Run extraction steps (avoiding duplicates) and populate the
-    // "extracted" collection.
-    await this.iterator.cycleAsync(async step => await this.process(step))
-
-    // 4. Generate the extraction result object.
-    // When no nested fields were found, we are extracting a single entity from
-    // the entire page. Otherwise, the result will need to be built recursively.
-    const exporter = new ExportVisitor(this.extractedIterator)
-    switch (this.rootElement.constructor.name) {
-      case 'Leaf':
-        this.result = exporter.visitLeaf(this.rootElement)
-        break
-      case 'Container':
-        this.result = exporter.visitContainer(this.rootElement)
-        break
-    }
-
-    return this.result
-  }
-
-  /**
    * Returns the "nesting level" of given extraction config object.
    *
    * @param {Object} config A single extraction config object.
@@ -379,7 +372,59 @@ class Extractor {
   }
 
   /**
-   * TODO (wip) Processes an exctraction "step".
+   * Returns the final resulting object.
+   */
+  async run () {
+    // 1. Populate the composite collection based on extraction configs.
+    // Start with root configs on root element, then recurse (if needed).
+    // @see setNestedExtractionConfig()
+    this.init(this.rootExtractionConfigs, { component: this.rootComponent })
+
+    // 2. TODO (wip) Sort the extraction steps to start from deepest levels ?
+    this.iterator.sort()
+
+    // Debug.
+    console.log(`Got ${this.steps.count()} selectors to run.`)
+    this.iterator.cycle(step => {
+      // console.log(`  depth ${step.getDepth()} (extract ${step.extract} as ${step.as}) : ${step.selector}`)
+      const depth = step.getDepth()
+      const debugIndent = '  '.repeat(depth)
+      console.log(`${debugIndent}depth ${depth} : ${step.ancestorsChain}`)
+      console.log(`${debugIndent}  ( ${step.selector} )`)
+    })
+
+    // 3. Execute the actual extraction using the pageWorker.
+    // TODO (wip) Run all (optional) custom processes before extraction ?
+    // This could be run instead of the normal process() call. See what makes
+    // most sense later.
+    // If the config has a 'preprocess' key, its value serves as the event
+    // emitted to allow custom implementations that would prepare elements (e.g.
+    // add custom classes) to facilitate the extraction process.
+    await this.iterator.cycleAsync(async step => {
+      if ('emit' in step) {
+        await this.main.emit(step.emit, step, this)
+      }
+    })
+    await this.iterator.cycleAsync(async step => await this.process(step))
+
+    // 4. Generate the extraction result object.
+    // When no nested fields were found, we are extracting a single entity from
+    // the entire page. Otherwise, the result will need to be built recursively.
+    const exporter = new ExportVisitor(this.extractedIterator)
+    switch (this.rootComponent.constructor.name) {
+      case 'Leaf':
+        this.result = exporter.visitLeaf(this.rootComponent)
+        break
+      case 'Container':
+        this.result = exporter.visitContainer(this.rootComponent)
+        break
+    }
+
+    return this.result
+  }
+
+  /**
+   * Processes an exctraction "step".
    *
    * This is called recursively to allow nested components extraction.
    *

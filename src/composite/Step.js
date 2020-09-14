@@ -25,16 +25,54 @@ class Step extends Iterable {
     this.ancestors = config.ancestors
   }
 
-  setDepth (depth) {
-    if (depth) {
-      this.depth = depth
+  /**
+   * Overrides base class method to add convenience debug markers.
+   *
+   * @param {array} ancestors
+   */
+  setAncestors (ancestors) {
+    this.ancestors = ancestors
+
+    this.ancestorsChain = ''
+    if (this.parent) {
+      this.ancestorsChain = this.ancestors.map(e => e.as).join(' <- ') + ' <- '
+    }
+    this.ancestorsChain += this.as
+  }
+
+  /**
+   * Overrides base class method to scope and customize lookup selectors.
+   *
+   * Allows jQuery-like selector syntax if there is a DOM Query Helper available
+   * in browsed page(s).
+   * @see Page.addDomQueryHelper()
+   *
+   * Examples of jQuery-like syntax :
+   *   1. Set a custom class on parent element and use it as new scope :
+   *     "selector": ".nav-tabs.parent()"
+   *   2. Idem, but using closest() to set scope in any ancestor (stops at closest
+   *    match) :
+   *     "selector": ".nav-tabs.closest(section)"
+   *   3. Going up then down the DOM tree :
+   *     "selector": ".nav-tabs.closest(section).find(.something)"
+   *
+   * @param {string} scope (optional) Allows overriding this method's result.
+   */
+  setScope (scope) {
+    // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
+    // classes).
+    // if (this.main.getSetting('addDomQueryHelper')) {
+    // }
+
+    if (scope) {
+      this.scope = scope
       return
     }
-    if (this.ancestors.length) {
-      this.depth = this.ancestors.length - 1
-      return
+
+    if (this.parent && this.parent.selector) {
+      this.scope = this.parent.selector
+      this.selector = `${this.parent.selector} ${this.selector}`
     }
-    this.depth = 0
   }
 
   getComponent () {
@@ -47,66 +85,6 @@ class Step extends Iterable {
       return destination[2]
     }
     return destination[1]
-  }
-
-  /**
-   * Preprocesses extraction step before running the actual process.
-   *
-   * This facilitates scope handling, allows customizations and jQuery-like
-   * selector syntax if there is a DOM Query Helper available in browsed page(s).
-   * @see Page.addDomQueryHelper()
-   *
-   * If the config has a 'preprocess' key, its value serves as the event
-   * emitted to allow custom implementations that would prepare elements (e.g. add
-   * custom classes) to facilitate the extraction process.
-   *
-   * Examples of jQuery-like syntax :
-   *   1. Set a custom class on parent element and use it as new scope :
-   *     "selector": ".nav-tabs.parent()"
-   *   2. Idem, but using closest() to set scope in any ancestor (stops at closest
-   *    match) :
-   *     "selector": ".nav-tabs.closest(section)"
-   *   3. Going up then down the DOM tree :
-   *     "selector": ".nav-tabs.closest(section).find(.something)"
-   */
-  preprocess () {
-    let ancestorsChain = ''
-
-    if (!this.ancestors) {
-      this.ancestors = []
-    }
-
-    if (this.parent) {
-      ancestorsChain = this.ancestors.map(e => e.as).join(' <- ') + ' <- '
-
-      // Assign a scope for current config, and prepend selector for ensuring
-      // correct nesting.
-      if (this.parent.selector) {
-        this.scope = this.parent.selector
-        this.selector = `${this.parent.selector} ${this.selector}`
-      }
-    }
-
-    this.depth = this.ancestors.length
-    this.ancestorsChain = ancestorsChain + this.as
-
-    // Call any custom 'preprocess' implementations.
-    if ('preprocess' in this) {
-      this.main.emit(this.preprocess, this)
-    }
-
-    // Debug.
-    const debugIndent = '  '.repeat(this.depth)
-    console.log(`${debugIndent}depth ${this.depth} : ${this.ancestorsChain}`)
-    console.log(`${debugIndent}  ( ${this.selector} )`)
-    if (this.fieldOverride) {
-      console.log(`${debugIndent}  as ${this.fieldOverride}`)
-    }
-
-    // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
-    // classes).
-    // if (this.main.getSetting('addDomQueryHelper')) {
-    // }
   }
 }
 
