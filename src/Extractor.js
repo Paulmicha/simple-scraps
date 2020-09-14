@@ -167,8 +167,12 @@ class Extractor {
   /**
    * Populates the composite collection based on extraction configs.
    *
-   * We need to obtain instances of composite Leaf and Container classes to
-   * represent what will be extracted :
+   * Step class instances are the Collection items which are traversable via
+   * Iterator and exportable via ExportVisitor.
+   *
+   * We need to obtain instances of composite Component classes (Leaf and
+   * Container) to represent what will be extracted (in as many steps as there
+   * are selectors to run - i.e. one step per Component field or prop) :
    *   1. Single fields or properties of the main entity being extracted
    *     (because 1 Extractor works on 1 open page = 1 resulting object)
    *   2. Groups of multiple fields or properties (e.g. a component)
@@ -225,6 +229,24 @@ class Extractor {
         this.tree.add(new Step(config, this.main))
       }
     }
+  }
+
+  /**
+   * Determines if given extraction config corresponds to a composite container
+   * or leaf component.
+   */
+  isContainer (config) {
+    if (Array.isArray(config.extract)) {
+      for (let i = 0; i < config.extract.length; i++) {
+        const subConfig = config.extract[i]
+        if (this.isContainer(subConfig)) {
+          return true
+        }
+      }
+    } else {
+      return this.main.getSetting('extractionContainerTypes').includes(config.extract)
+    }
+    return false
   }
 
   /**

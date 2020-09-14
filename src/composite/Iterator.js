@@ -57,10 +57,8 @@ class Iterator {
       if (a.depth > b.depth) {
         return 1
       }
-      // Equality leads to CSS selectors specificity comparison.
-      if (a.depth === b.depth) {
-        return compare(a.selector, b.selector)
-      }
+      // Fallback : equality leads to CSS selectors specificity comparison.
+      return compare(a.selector, b.selector)
     })
   }
 }

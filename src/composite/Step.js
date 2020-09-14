@@ -51,24 +51,6 @@ class Step {
   }
 
   /**
-   * Determines if current extraction config corresponds to a composite
-   * container or leaf component.
-   */
-  isContainer () {
-    if (Array.isArray(this.extract)) {
-      for (let i = 0; i < this.extract.length; i++) {
-        const subConfig = this.extract[i]
-        if (this.isContainer(subConfig)) {
-          return true
-        }
-      }
-    } else {
-      return this.main.getSetting('extractionContainerTypes').includes(this.extract)
-    }
-    return false
-  }
-
-  /**
    * Preprocesses extraction step before running the actual process.
    *
    * This facilitates scope handling, allows customizations and jQuery-like
@@ -90,6 +72,10 @@ class Step {
    */
   preprocess () {
     let ancestorsChain = ''
+
+    if (!this.ancestors) {
+      this.ancestors = []
+    }
 
     if (this.parent) {
       ancestorsChain = this.ancestors.map(e => e.as).join(' <- ') + ' <- '
