@@ -1,9 +1,10 @@
 const Iterator = require('./Iterator')
 
 /**
- * Composite store containing extraction steps.
+ * Composite store containing Iterable instances (items).
  *
- * @see src/composite/Step.js
+ * @see src/composite/Iterator.js
+ * @see src/composite/Iterable.js (-> Step, Component -> Container, Leaf)
  */
 class Collection {
   constructor () {

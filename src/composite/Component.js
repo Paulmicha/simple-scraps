@@ -1,13 +1,17 @@
+const Iterable = require('./Iterable')
 
 /**
  * Chain of responsability pattern : base handler.
  *
  * Represents anything that can be extracted from the DOM tree corresponding to
  * a single (CSS) selector, which can match multiple elements.
+ *
+ * @see src/composite/Container.js
+ * @see src/composite/Leaf.js
  */
-class Component {
+class Component extends Iterable {
   constructor (selector, container) {
-    this.selector = selector
+    super()
     this.container = container
     this.extracted = {}
   }

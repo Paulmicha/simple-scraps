@@ -1,3 +1,4 @@
+const Iterable = require('./Iterable')
 
 /**
  * Composite collection item wrapping extraction configs and components.
@@ -9,8 +10,9 @@
  * Each instance of this class represents a single extraction step which will
  * be exectued in Extractor.process() method.
  */
-class Step {
+class Step extends Iterable {
   constructor (config, main) {
+    super()
     this.component = config.component
     this.selector = config.selector
     this.extract = config.extract
@@ -21,13 +23,6 @@ class Step {
 
     // This will be reset in Extractor.setNestedExtractionConfig().
     this.ancestors = config.ancestors
-
-    // This will be reset in this.preprocess().
-    this.depth = 0
-  }
-
-  getParent () {
-    return this.parent
   }
 
   getComponent () {
@@ -40,14 +35,6 @@ class Step {
       return destination[2]
     }
     return destination[1]
-  }
-
-  // setAncestors (ancestors) {
-  //   this.ancestors = ancestors
-  // }
-
-  setDescendants (descendants) {
-    this.descendants = descendants
   }
 
   /**

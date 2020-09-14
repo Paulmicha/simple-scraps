@@ -45,9 +45,13 @@ class Extractor {
     }
 
     // The extraction process uses a composite tree collection to store a
-    // representation of all the selectors to run and the extraction result.
-    this.tree = new Collection()
-    this.iterator = this.tree.createIterator()
+    // representation of all the selectors to extract (i.e. Step instances), and
+    // another collection for extraction results which are structured
+    // differently (Component instances -> Container, Leaf).
+    this.steps = new Collection()
+    this.iterator = this.steps.createIterator()
+    this.extracted = new Collection()
+    this.extractedIterator = this.extracted.createIterator()
 
     // Finally, the composite tree has a single shared "root" : the HTML
     // document itself. Either we have nested components configs which require
@@ -58,6 +62,7 @@ class Extractor {
     } else {
       this.rootElement = new Leaf('')
     }
+    this.extracted.push(this.rootElement)
   }
 
   /**
@@ -186,19 +191,19 @@ class Extractor {
 
     for (let i = 0; i < configs.length; i++) {
       const config = { ...configs[i] }
-      const isContainer = this.isContainer(config)
 
       config.parent = parent
 
       // If this extraction config has multiple sub-extraction configs, it must
-      // be represented by a single composite instance having multiple fields or
-      // properties (e.g. a component)
+      // be represented by a single composite instance having 1 or more fields
+      // or properties (i.e. an instance of Component -> Container or Leaf).
       if (Array.isArray(config.extract)) {
-        if (isContainer) {
+        if (this.isContainer(config)) {
           config.component = new Container(config.selector)
         } else {
           config.component = new Leaf(config.selector)
         }
+        this.extracted.push(config.component)
 
         config.extract.map(subExtractionConfig => {
           subExtractionConfig.parent = config
@@ -212,7 +217,7 @@ class Extractor {
             this.setNestedExtractionConfig(subExtractionConfig)
           }
 
-          this.tree.add(new Step(subExtractionConfig, this.main))
+          this.steps.add(new Step(subExtractionConfig, this.main))
         })
       } else {
         // Otherwise, we're dealing with individual fields or properties of the
@@ -226,7 +231,7 @@ class Extractor {
           this.setNestedExtractionConfig(config)
         }
 
-        this.tree.add(new Step(config, this.main))
+        this.steps.add(new Step(config, this.main))
       }
     }
   }
@@ -290,7 +295,7 @@ class Extractor {
     this.iterator.sort()
 
     // Debug.
-    // console.log(`Got ${this.tree.count()} selectors to run.`)
+    // console.log(`Got ${this.steps.count()} selectors to run.`)
     // this.iterator.cycle(config => {
     //   console.log('tree item :')
     //   console.log(config)
@@ -303,7 +308,7 @@ class Extractor {
     // 4. Generate the extraction result object.
     // When no nested fields were found, we are extracting a single entity from
     // the entire page. Otherwise, the result will need to be built recursively.
-    const exporter = new ExportVisitor(this.iterator)
+    const exporter = new ExportVisitor(this.extractedIterator)
     switch (this.rootElement.constructor.name) {
       case 'Leaf':
         this.result = exporter.visitLeaf(this.rootElement)
