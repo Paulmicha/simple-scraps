@@ -54,7 +54,10 @@ class Step extends Iterable {
 
     if (this.parent && this.parent.selector) {
       this.scope = this.parent.selector
-      this.selector = `${this.parent.selector} ${this.selector}`
+
+      if (this.parent.selector.length && this.parent.selector !== ':root') {
+        this.selector = `${this.parent.selector} ${this.selector}`
+      }
     }
   }
 

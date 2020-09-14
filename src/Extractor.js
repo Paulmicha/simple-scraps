@@ -172,7 +172,9 @@ class Extractor {
 
     // Debug.
     // console.log(`iterableFactory() : ${JSON.stringify(spec)}`)
-    console.log(`iterableFactory() : ${Object.keys(spec)} (type = ${type})`)
+    // console.log(`iterableFactory() : ${Object.keys(spec)} (type = ${type})`)
+    console.log(`iterableFactory(${type})`)
+
     if (config) {
       console.log(`  '${config.extract}' as ${config.as}`)
       if (config.parent && config.parent.as) {
@@ -332,11 +334,26 @@ class Extractor {
           })
         })
       } else {
-        // Otherwise, we're dealing with individual fields or properties of the
-        // main entity being extracted (i.e. at the root of the tree) or, if
-        // called in recursive components lookup, of the component representing
-        // what would be extracted if a match exists at this nesting depth.
-        config.component = parent.component
+        // Otherwise, we're dealing with a single field or property.
+        // It could be belonging to the page document root, or to a component
+        // that has a single field setup for extraction.
+        const destination = config.as.split('.')
+
+        // If a config 'extract' key is not an array and has a destination ('as'
+        // key) corresponding to a component, we assume that the component is
+        // to be extracted as a single prop component (contained in the parent
+        // config component).
+        if (destination[0] === 'component') {
+          config.component = this.iterableFactory({
+            type: 'component',
+            config
+          })
+          config.component.setContainer(parent.component)
+        } else {
+          // Otherwise, it's a field or property belonging to the page document
+          // root.
+          config.component = parent.component
+        }
 
         // A single field can still contain nested components.
         if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
@@ -372,7 +389,7 @@ class Extractor {
     if (Array.isArray(config.extract)) {
       config.extract.forEach(subExtractionConfig =>
         this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
-        this.nestExtractionConfig(subExtractionConfig, config)
+        this.nestExtractionConfig(subExtractionConfig)
       )
     } else if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
       const nestingLevel = this.getConfigNestingLevel(config)
@@ -416,18 +433,18 @@ class Extractor {
     // scopes in the page.
 
     // Debug.
-    console.log(`Got ${this.steps.count()} selectors to run.`)
+    console.log(`run() ${this.steps.count()} selectors, ${this.extracted.count()} components.`)
 
     // Debug.
-    console.log('Before sorting :')
-    this.iterator.traverse(step => step.locate())
+    // console.log('Before sorting :')
+    // this.iterator.traverse(step => step.locate())
 
     // 2. TODO (wip) Sort the extraction steps to start from deepest levels ?
     this.iterator.sort()
 
     // Debug.
-    console.log('After sorting :')
-    this.iterator.traverse(step => step.locate())
+    // console.log('After sorting :')
+    // this.iterator.traverse(step => step.locate())
 
     // 3. Execute the actual extraction using the pageWorker.
     // TODO (wip) Run all (optional) custom processes before extraction ?
