@@ -62,7 +62,7 @@ class Extractor {
     } else {
       this.rootElement = new Leaf('')
     }
-    this.extracted.push(this.rootElement)
+    this.extracted.add(this.rootElement)
   }
 
   /**
@@ -203,7 +203,7 @@ class Extractor {
         } else {
           config.component = new Leaf(config.selector)
         }
-        this.extracted.push(config.component)
+        this.extracted.add(config.component)
 
         config.extract.map(subExtractionConfig => {
           subExtractionConfig.parent = config
