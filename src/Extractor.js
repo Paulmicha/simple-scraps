@@ -204,10 +204,6 @@ class Extractor {
           instance = new Leaf(config)
         }
 
-        if (config.component) {
-          instance.setContainer(config.component)
-        }
-
         this.extracted.add(instance)
         break
 
@@ -516,6 +512,32 @@ class Extractor {
     // Debug.
     console.log(`${debugIndent || ''}  extracting ${step.extract}`)
 
+    // When the 'extract' value is a container type, the component has to be
+    // an instance of a composite Container (with children).
+    if (this.main.getSetting('extractionContainerTypes').includes(step.extract)) {
+      if (component.constructor.name !== 'Container') {
+        throw Error("Can't process a 'container' extraction type when the component is not a Container itself.")
+      }
+
+      const children = component.getChildren()
+
+      // Nothing to set when there are no children.
+      if (!children.length) {
+        return
+      }
+
+      // Debug.
+      // console.log(`Children of ${component.getName()} :`)
+      // children.forEach(child => {
+      //   console.log(`  ${child.getName()}`)
+      //   console.log(child.extracted)
+      // })
+
+      component.setField(field, children.map(child => {
+        return { c: child.getName(), props: child.extracted }
+      }))
+    }
+
     // "Normal" process : config.extract is a string.
     switch (step.extract) {
       case 'text': {
@@ -555,47 +577,6 @@ class Extractor {
       // TODO implement an extraction for attribute(s).
       case 'element':
         await elementFieldProcess({ step, component, field })
-        break
-
-      // TODO (wip) refactor in progress : need to make recursive calls
-
-      // In order to support nested components extraction, we need to start from
-      // the "deepest" nesting levels to avoid matching the same elements multiple
-      // times. This is achieved by storing 'components' fields aside for later
-      // processing during a second extraction pass, where we'll be able to scope
-      // extraction and mark extracted components to avoid potential duplicates.
-      // @see runrunSecondPass()
-      case 'components':
-        component.setField(field, {
-          c: step.as.split('.')[1],
-          props: { ...component.extracted }
-        })
-
-        // Debug.
-        // console.log('component scope = ' + step.getScope())
-        console.log(component)
-
-        // await componentsFieldProcess({ config, component, field })
-
-        // TODO other refactor in progress.
-        /*
-        // This placeholder sits in the exact place in the extracted object where
-        // components will be looked for and merged during the second pass.
-        const componentsFieldPlaceholder = {}
-        extracted[field] = componentsFieldPlaceholder
-
-        // Store references to placeholder objects in a single property directly
-        // on the page worker instance for easier processing later on.
-        // @see runSecondPass()
-        this.pageWorker.extractionPlaceholders.push({
-          placeholder: componentsFieldPlaceholder,
-          context: o
-        })
-
-        // We still need to look ahead for "seeding" components nesting other
-        // components.
-        // TODO (wip)
-        */
         break
     }
   }

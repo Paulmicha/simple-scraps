@@ -13,8 +13,9 @@ class Component extends Iterable {
     this.extracted = {}
   }
 
-  setContainer (container) {
-    this.container = container
+  getName () {
+    const destination = this.as.split('.')
+    return destination[1] || this.as
   }
 
   setField (prop, value) {
