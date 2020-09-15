@@ -171,21 +171,10 @@ class Extractor {
     let instanceParentField
 
     // Debug.
-    // console.log(`iterableFactory(${type})`)
-    // if (config) {
-    //   let debugExtract = config.extract
-    //   if (Array.isArray(config.extract)) {
-    //     debugExtract = config.extract.map(e => e.as).join(', ')
-    //   }
-    //   console.log(`  '${debugExtract}' as ${config.as}`)
-    //   if (config.parent && config.parent.as) {
-    //     debugExtract = config.parent.extract
-    //     if (Array.isArray(config.parent.extract)) {
-    //       debugExtract = config.parent.extract.map(e => e.as).join(', ')
-    //     }
-    //     console.log(`    via '${debugExtract}' as ${config.parent.as}`)
-    //   }
-    // }
+    console.log(`iterableFactory(${type})`)
+    if (config) {
+      this.locateConfig(config)
+    }
 
     switch (type) {
       case 'step':
@@ -210,8 +199,9 @@ class Extractor {
         }
 
         // Debug.
-        console.log(`iterableFactory(${type}) : ${instance.getName()}`)
-        instance.locate('  = ')
+        // console.log(`iterableFactory(${type}) : ${instance.getName()}`)
+        console.log(`  component name = ${instance.getName()}`)
+        instance.locate('    ')
 
         this.extracted.add(instance)
         break
@@ -279,9 +269,16 @@ class Extractor {
     // console.log(`  keys: ${Object.keys(object)}`)
     // console.log(`  object[parentField] = ${JSON.stringify(object[parentField])}`)
 
-    while (object[parentField]) {
-      ancestors.push(object[parentField])
-      object = object[parentField]
+    // TODO (wip) debug memory leak :
+    // iterableFactory(step)
+    //   'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
+    //     from 'components' as component.NavTabs.items[].content
+    //       from 'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
+    //         from 'components' as entity.content
+    let loopObject = { ...object }
+    while (loopObject[parentField]) {
+      ancestors.push(loopObject[parentField])
+      loopObject = loopObject[parentField]
     }
 
     // Debug.
@@ -317,23 +314,12 @@ class Extractor {
 
       // Debug.
       console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
-      let debugExtract = config.extract
-      if (Array.isArray(config.extract)) {
-        debugExtract = config.extract.map(e => e.as).join(', ')
-      }
-      console.log(`  '${debugExtract}' as ${config.as}`)
-      if (config.parent && config.parent.as) {
-        debugExtract = config.parent.extract
-        if (Array.isArray(config.parent.extract)) {
-          debugExtract = config.parent.extract.map(e => e.as).join(', ')
-        }
-        console.log(`    via '${debugExtract}' as ${config.parent.as}`)
-      }
+      this.locateConfig(config)
 
       // TODO (wip) break memory leak.
-      if (nestingLevel > 1 && i > 0) {
-        return
-      }
+      // if (nestingLevel > 1 && i > 0) {
+      //   return
+      // }
 
       // If this extraction config has multiple sub-extraction configs, it must
       // be represented by a single composite instance having 1 or more fields
@@ -608,6 +594,33 @@ class Extractor {
       case 'element':
         await elementFieldProcess({ step, component, field })
         break
+    }
+  }
+
+  /**
+   * Debug utility.
+   */
+  locateConfig (config, prefix) {
+    if (!prefix) {
+      prefix = '  '
+    }
+
+    let debugExtract = config.extract
+    if (Array.isArray(config.extract)) {
+      debugExtract = config.extract.map(e => e.as).join(', ')
+    }
+    console.log(`${prefix}'${debugExtract}' as ${config.as}`)
+
+    let i = 0
+    let confLoop = { ...config }
+    while (confLoop.parent && confLoop.parent.as) {
+      i++
+      debugExtract = confLoop.parent.extract
+      if (Array.isArray(confLoop.parent.extract)) {
+        debugExtract = confLoop.parent.extract.map(e => e.as).join(', ')
+      }
+      console.log(`${prefix.repeat(i)}  from '${debugExtract}' as ${confLoop.parent.as}`)
+      confLoop = confLoop.parent
     }
   }
 }

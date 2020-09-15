@@ -49,7 +49,7 @@ class Iterable {
    */
   setDepth (depth) {
     // Debug.
-    // console.log(`setDepth(${depth}) / this.ancestorsChain = '${this.ancestorsChain}'`)
+    // console.log(`setDepth(${depth || ''}) : '${this.ancestorsChain}'`)
 
     if (depth) {
       this.depth = depth
@@ -86,7 +86,10 @@ class Iterable {
     const debugIndent = prefix + '  '.repeat(depth)
 
     console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: ${this.ancestorsChain}`)
-    console.log(`${debugIndent}  ( ${this.selector} )`)
+
+    if (this.selector) {
+      console.log(`${debugIndent}  ( ${this.selector} )`)
+    }
   }
 }
 
