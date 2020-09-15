@@ -171,16 +171,21 @@ class Extractor {
     let instanceParentField
 
     // Debug.
-    // console.log(`iterableFactory() : ${JSON.stringify(spec)}`)
-    // console.log(`iterableFactory() : ${Object.keys(spec)} (type = ${type})`)
-    console.log(`iterableFactory(${type})`)
-
-    if (config) {
-      console.log(`  '${config.extract}' as ${config.as}`)
-      if (config.parent && config.parent.as) {
-        console.log(`    via '${config.parent.extract}' as ${config.parent.as}`)
-      }
-    }
+    // console.log(`iterableFactory(${type})`)
+    // if (config) {
+    //   let debugExtract = config.extract
+    //   if (Array.isArray(config.extract)) {
+    //     debugExtract = config.extract.map(e => e.as).join(', ')
+    //   }
+    //   console.log(`  '${debugExtract}' as ${config.as}`)
+    //   if (config.parent && config.parent.as) {
+    //     debugExtract = config.parent.extract
+    //     if (Array.isArray(config.parent.extract)) {
+    //       debugExtract = config.parent.extract.map(e => e.as).join(', ')
+    //     }
+    //     console.log(`    via '${debugExtract}' as ${config.parent.as}`)
+    //   }
+    // }
 
     switch (type) {
       case 'step':
@@ -203,6 +208,10 @@ class Extractor {
         } else {
           instance = new Leaf(config)
         }
+
+        // Debug.
+        console.log(`iterableFactory(${type}) : ${instance.getName()}`)
+        instance.locate('  = ')
 
         this.extracted.add(instance)
         break
@@ -243,7 +252,7 @@ class Extractor {
       }
     } else {
       // Debug
-      console.log(`isContainer(${config.extract}) ? -> ${this.main.getSetting('extractionContainerTypes').includes(config.extract)}`)
+      // console.log(`isContainer(${config.extract}) ? -> ${this.main.getSetting('extractionContainerTypes').includes(config.extract)}`)
 
       return this.main.getSetting('extractionContainerTypes').includes(config.extract)
     }
@@ -305,6 +314,26 @@ class Extractor {
       const config = { ...configs[i] }
 
       config.parent = parent
+
+      // Debug.
+      console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
+      let debugExtract = config.extract
+      if (Array.isArray(config.extract)) {
+        debugExtract = config.extract.map(e => e.as).join(', ')
+      }
+      console.log(`  '${debugExtract}' as ${config.as}`)
+      if (config.parent && config.parent.as) {
+        debugExtract = config.parent.extract
+        if (Array.isArray(config.parent.extract)) {
+          debugExtract = config.parent.extract.map(e => e.as).join(', ')
+        }
+        console.log(`    via '${debugExtract}' as ${config.parent.as}`)
+      }
+
+      // TODO (wip) break memory leak.
+      if (nestingLevel > 1 && i > 0) {
+        return
+      }
 
       // If this extraction config has multiple sub-extraction configs, it must
       // be represented by a single composite instance having 1 or more fields
@@ -398,8 +427,8 @@ class Extractor {
 
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
         // Debug.
-        console.log(`recursive call to init() at nestingLevel ${nestingLevel} :`)
-        console.log(this.nestedExtractionConfigs)
+        // console.log(`recursive call to init() at nestingLevel ${nestingLevel} :`)
+        // console.log(this.nestedExtractionConfigs)
 
         this.init(this.nestedExtractionConfigs, config, nestingLevel)
       }
@@ -504,10 +533,11 @@ class Extractor {
     // }
 
     // Support fields containing multiple items with props.
-    // if (Array.isArray(config.extract)) {
-    //   await subItemsFieldProcess({ config, extracted, field })
-    //   return
-    // }
+    if (Array.isArray(step.extract)) {
+      // await subItemsFieldProcess({ config, extracted, field })
+      console.log(`${debugIndent || ''}  TODO extract is an array : ${step.extract.map(e => e.as)}`)
+      return
+    }
 
     // Debug.
     console.log(`${debugIndent || ''}  extracting ${step.extract}`)

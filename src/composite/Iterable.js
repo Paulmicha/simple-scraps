@@ -77,9 +77,13 @@ class Iterable {
   /**
    * Debug utility.
    */
-  locate () {
+  locate (prefix) {
+    if (!prefix) {
+      prefix = ''
+    }
+
     const depth = this.getDepth()
-    const debugIndent = '  '.repeat(depth)
+    const debugIndent = prefix + '  '.repeat(depth)
 
     console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: ${this.ancestorsChain}`)
     console.log(`${debugIndent}  ( ${this.selector} )`)
