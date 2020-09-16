@@ -102,6 +102,9 @@ nestedComponentsConfig.start[0].url = urls.article
 test.serial('3. Extract nested components', async t => {
   const scraps = new SimpleScraps(nestedComponentsConfig)
 
+  // TODO (wip) debug : remove when done.
+  scraps.setSetting('maxExtractionNestingDepth', 1)
+
   scraps.on('store.extraction.result', (entity, entityType, bundle, url, pageWorker) => {
     // While we're at it, test that the entity type and bundle mapping is
     // correct.

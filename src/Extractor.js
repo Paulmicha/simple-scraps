@@ -174,6 +174,16 @@ class Extractor {
     console.log(`iterableFactory(${type})`)
     if (config) {
       this.locateConfig(config)
+
+      // TODO (wip) circular parent references cause exponential lookups, even
+      // bound by the 'maxExtractionNestingDepth' setting.
+      // -> workaround : skip init (for now). Ideally, detect if scope exists
+      // on page (run CSS selector) to avoid instanciating every possible nested
+      // lookup combinations.
+      if (this.detectSelfNesting(config)) {
+        console.log('init() : self nesting detected')
+        return
+      }
     }
 
     switch (type) {
@@ -276,9 +286,12 @@ class Extractor {
     //       from 'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
     //         from 'components' as entity.content
     let loopObject = { ...object }
-    while (loopObject[parentField]) {
+    let i = this.main.getSetting('maxExtractionNestingDepth')
+
+    while (i > 0 && loopObject[parentField]) {
       ancestors.push(loopObject[parentField])
       loopObject = loopObject[parentField]
+      i--
     }
 
     // Debug.
@@ -309,6 +322,16 @@ class Extractor {
 
     for (let i = 0; i < configs.length; i++) {
       const config = { ...configs[i] }
+
+      // TODO (wip) circular parent references cause exponential lookups, even
+      // bound by the 'maxExtractionNestingDepth' setting.
+      // -> workaround : skip init (for now). Ideally, detect if scope exists
+      // on page (run CSS selector) to avoid instanciating every possible nested
+      // lookup combinations.
+      if (this.detectSelfNesting(config)) {
+        console.log('init() : self nesting detected')
+        continue
+      }
 
       config.parent = parent
 
@@ -432,6 +455,71 @@ class Extractor {
       return ancestors.length - 1
     }
     return 0
+  }
+
+  /**
+   * Workaround memory leak.
+   *
+   * TODO figure out why getAncestors() seems to create a memory leak when
+   * looking for instances of a component inside itself, e.g. :
+   *
+   * iterableFactory(step)
+   *   'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
+   *     from 'components' as component.NavTabs.items[].content
+   *       from 'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
+   *         from 'components' as entity.content
+   */
+  detectSelfNesting (config) {
+    let stringifiedExtract = config.extract
+    if (Array.isArray(config.extract)) {
+      stringifiedExtract = config.extract.map(e => e.as).join(', ')
+    }
+    const currentStep = `extract '${stringifiedExtract}' as ${config.as}`
+
+    let i = this.main.getSetting('maxExtractionNestingDepth')
+    let confLoop = { ...config }
+
+    while (i > 0 && confLoop.parent && confLoop.parent.as) {
+      stringifiedExtract = confLoop.parent.extract
+      if (Array.isArray(confLoop.parent.extract)) {
+        stringifiedExtract = confLoop.parent.extract.map(e => e.as).join(', ')
+      }
+
+      if (currentStep === `extract '${stringifiedExtract}' as ${confLoop.parent.as}`) {
+        return true
+      }
+      confLoop = { ...confLoop.parent }
+      i--
+    }
+
+    return false
+  }
+
+  /**
+   * Debug utility.
+   */
+  locateConfig (config, prefix) {
+    if (!prefix) {
+      prefix = '  '
+    }
+
+    let stringifiedExtract = config.extract
+    if (Array.isArray(config.extract)) {
+      stringifiedExtract = config.extract.map(e => e.as).join(', ')
+    }
+    console.log(`${prefix}'${stringifiedExtract}' as ${config.as}`)
+
+    let i = 0
+    let confLoop = { ...config }
+    while (i < this.main.getSetting('maxExtractionNestingDepth') && confLoop.parent && confLoop.parent.as) {
+      stringifiedExtract = confLoop.parent.extract
+      if (Array.isArray(confLoop.parent.extract)) {
+        stringifiedExtract = confLoop.parent.extract.map(e => e.as).join(', ')
+      }
+      console.log(`${prefix.repeat(i)}  from '${stringifiedExtract}' as ${confLoop.parent.as}`)
+      confLoop = confLoop.parent
+      i++
+    }
   }
 
   /**
@@ -594,33 +682,6 @@ class Extractor {
       case 'element':
         await elementFieldProcess({ step, component, field })
         break
-    }
-  }
-
-  /**
-   * Debug utility.
-   */
-  locateConfig (config, prefix) {
-    if (!prefix) {
-      prefix = '  '
-    }
-
-    let debugExtract = config.extract
-    if (Array.isArray(config.extract)) {
-      debugExtract = config.extract.map(e => e.as).join(', ')
-    }
-    console.log(`${prefix}'${debugExtract}' as ${config.as}`)
-
-    let i = 0
-    let confLoop = { ...config }
-    while (confLoop.parent && confLoop.parent.as) {
-      i++
-      debugExtract = confLoop.parent.extract
-      if (Array.isArray(confLoop.parent.extract)) {
-        debugExtract = confLoop.parent.extract.map(e => e.as).join(', ')
-      }
-      console.log(`${prefix.repeat(i)}  from '${debugExtract}' as ${confLoop.parent.as}`)
-      confLoop = confLoop.parent
     }
   }
 }
