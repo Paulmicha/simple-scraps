@@ -66,10 +66,10 @@ class Iterator {
       }
 
       // Debug.
-      // console.log(`compare(${a.getScope()}, ${b.getScope()}) = ${compare(a.getScope(), b.getScope())}`)
+      // console.log(`compare(${a.getSelector()}, ${b.getSelector()}) = ${compare(a.getSelector(), b.getSelector())}`)
 
       // Fallback : equality leads to CSS selectors specificity comparison.
-      return compare(a.getScope(), b.getScope()) * -1
+      return compare(a.getSelector(), b.getSelector()) * -1
     })
   }
 }

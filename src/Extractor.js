@@ -86,7 +86,7 @@ class Extractor {
     // recursive lookups, or we simply extract 1 or more fields of the same
     // root entity.
     // Also define the corresponding extraction config representation.
-    this.rootExtractionConfig = { selector: '', extract: '*', as: 'root' }
+    this.rootExtractionConfig = { selector: '', extract: '*', as: 'rootComponent' }
     this.rootComponent = this.iterableFactory({
       type: 'rootComponent',
       config: this.rootExtractionConfig
@@ -201,24 +201,8 @@ class Extractor {
    * Binds Iterable composite instances creation and scoping during init().
    */
   iterableFactory (spec) {
-    const { type, scope, config, container } = spec
+    const { type, config, container } = spec
     let instance
-
-    // Debug.
-    console.log(`iterableFactory(${type})`)
-    if (config) {
-      this.locateConfig(config)
-
-      // TODO (wip) circular parent references cause exponential lookups, even
-      // bound by the 'maxExtractionNestingDepth' setting.
-      // -> workaround : skip init (for now). Ideally, detect if scope exists
-      // on page (run CSS selector) to avoid instanciating every possible nested
-      // lookup combinations.
-      // if (this.detectSelfNesting(config)) {
-      //   console.log('init() : self nesting detected')
-      //   return
-      // }
-    }
 
     switch (type) {
       case 'step':
@@ -234,7 +218,11 @@ class Extractor {
 
         // Scope the selector.
         instance.setAncestors()
-        instance.setScope(scope)
+        instance.scopeSelector()
+
+        // Debug.
+        console.log(`iterableFactory(${type})`)
+        instance.locate('  ')
 
         // Check if it matches at least 1 element in the page. If it does, we
         // can add it to the collection for processing.
@@ -259,11 +247,6 @@ class Extractor {
           instance = new Leaf(this, config)
         }
 
-        // Debug.
-        // console.log(`iterableFactory(${type}) : ${instance.getName()}`)
-        console.log(`  component name = ${instance.getName()}`)
-        instance.locate('    ')
-
         // Set parent / ancestors scope.
         if (config) {
           instance.setParentConfig(config.parent)
@@ -274,7 +257,11 @@ class Extractor {
 
         // Scope the selector.
         instance.setAncestors()
-        instance.setScope(scope)
+        instance.scopeSelector()
+
+        // Debug.
+        console.log(`iterableFactory(${type}) : ${instance.getName()}`)
+        instance.locate('  ')
 
         // Check if it matches at least 1 element in the page. If it does, we
         // can add it to the collection for processing.
@@ -453,7 +440,7 @@ class Extractor {
     if (Array.isArray(config.extract)) {
       config.extract.forEach(subExtractionConfig =>
         this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
-        this.nestExtractionConfig(subExtractionConfig)
+        this.nestExtractionConfig(subExtractionConfig, nestingLevel)
       )
     } else if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
       // const nestingLevel = this.getConfigNestingLevel(config)

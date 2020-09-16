@@ -1,5 +1,5 @@
 /**
- * Defines a common base for sortable Collection items (via Iterator).
+ * Base class of all Collection items (traversable and sortable via Iterator).
  *
  * @see src/composite/Step.js
  * @see src/composite/Component.js (-> Container, Leaf)
@@ -87,8 +87,8 @@ class Iterable {
     }
 
     // Debug.
-    console.log('setAncestors() :')
-    console.log(this.ancestorsChain)
+    // console.log('setAncestors() :')
+    // console.log(this.ancestorsChain)
 
     this.setDepth()
 
@@ -168,12 +168,46 @@ class Iterable {
     return this.depth
   }
 
-  setScope (scope) {
-    this.scope = scope
+  /**
+   * Scope and customize lookup selectors.
+   *
+   * Allows jQuery-like selector syntax if there is a DOM Query Helper available
+   * in browsed page(s).
+   * @see Page.addDomQueryHelper()
+   *
+   * Examples of jQuery-like syntax :
+   *   1. Set a custom class on parent element and use it as new scope :
+   *     "selector": ".nav-tabs.parent()"
+   *   2. Idem, but using closest() to set scope in any ancestor (stops at
+   *     closest match) :
+   *     "selector": ".nav-tabs.closest(section)"
+   *   3. Going up then down the DOM tree :
+   *     "selector": ".nav-tabs.closest(section).find(.something)"
+   *
+   * @param {string} selector (optional) Allows overriding this method's result.
+   */
+  scopeSelector (selector) {
+    // TODO (wip) Detect + convert jQuery-like syntax to normal CSS selectors
+    // (by injecting custom classes in page DOM elements ?)
+    // if (this.extractor.main.getSetting('addDomQueryHelper')) {
+    // }
+
+    if (selector) {
+      this.setSelector(selector)
+      return
+    }
+
+    const parentConfig = this.getParentConfig()
+
+    if (parentConfig && parentConfig.selector) {
+      if (parentConfig.selector.length && parentConfig.selector !== ':root') {
+        this.selector = `${parentConfig.selector} ${this.selector}`
+      }
+    }
   }
 
-  getScope () {
-    return this.scope
+  setSelector (selector) {
+    this.selector = selector
   }
 
   getSelector () {
@@ -181,7 +215,7 @@ class Iterable {
   }
 
   /**
-   * Debug utility.
+   * Debug utility : logs in console clues to situate this collection item.
    */
   locate (prefix) {
     if (!prefix) {
@@ -190,8 +224,11 @@ class Iterable {
 
     const depth = this.getDepth()
     const debugIndent = prefix + '  '.repeat(depth)
+    const debugAncestorsChain = this.constructor.name === 'Step'
+      ? this.ancestorsChain.config
+      : this.ancestorsChain.instance
 
-    console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: ${this.ancestorsChain.config}`)
+    console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: ${debugAncestorsChain}`)
 
     if (this.selector) {
       console.log(`${debugIndent}  ( ${this.selector} )`)
