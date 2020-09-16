@@ -10,8 +10,8 @@ class Iterable {
 
     this.depth = 0
     this.scope = ''
-    this.ancestors = []
-    this.ancestorsChain = ''
+    this.ancestors = {}
+    this.ancestorsChain = {}
 
     if (!config) {
       config = this.extractor.rootExtractionConfig
@@ -65,22 +65,25 @@ class Iterable {
 
   /**
    * Base ancestors + ancestorsChain props setter.
-   *
-   * @param {array} ancestors result of Extractor.getAncestors().
    */
-  setAncestors (ancestors) {
-    this.ancestors = ancestors
+  setAncestors () {
+    const types = ['config', 'instance']
 
-    if (this.ancestors && this.ancestors.length) {
-      this.ancestorsChain += this.ancestors
-        .map(e => e.as)
-        .filter(e => e && e.length)
-        .join(' <- ')
-      if (this.ancestorsChain.length) {
-        this.ancestorsChain += ' <- '
+    for (let i = 0; i < types.length; i++) {
+      const type = types[i]
+      this.ancestors[type] = this.getAncestors(type)
+
+      if (this.ancestors[type] && this.ancestors[type].length) {
+        this.ancestorsChain[type] += this.ancestors
+          .map(e => e.as)
+          .filter(e => e && e.length)
+          .join(' <- ')
+        if (this.ancestorsChain[type].length) {
+          this.ancestorsChain[type] += ' <- '
+        }
       }
+      this.ancestorsChain[type] += this.as
     }
-    this.ancestorsChain += this.as
 
     this.setDepth()
 
@@ -93,6 +96,10 @@ class Iterable {
    * depth level to the root (depth 0).
    */
   getAncestors (type) {
+    if (this.ancestors[type]) {
+      return this.ancestors[type]
+    }
+
     const ancestors = []
     let loopObject = this.getAncestor(type, this)
 
@@ -125,8 +132,8 @@ class Iterable {
     }
   }
 
-  getAncestorsChain () {
-    return this.ancestorsChain
+  getAncestorsChain (type) {
+    return this.ancestorsChain[type]
   }
 
   /**
@@ -143,8 +150,10 @@ class Iterable {
       this.depth = depth
       return
     }
-    if (this.ancestors.length && this.ancestors.length > 2) {
-      this.depth = this.ancestors.length - 2
+
+    const configAncestors = this.getAncestors('config')
+    if (configAncestors.length && configAncestors.length > 2) {
+      this.depth = configAncestors.length - 2
       return
     }
     this.depth = 0
@@ -162,6 +171,10 @@ class Iterable {
     return this.scope
   }
 
+  getSelector () {
+    return this.selector
+  }
+
   /**
    * Debug utility.
    */
@@ -173,7 +186,7 @@ class Iterable {
     const depth = this.getDepth()
     const debugIndent = prefix + '  '.repeat(depth)
 
-    console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: ${this.ancestorsChain}`)
+    console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: ${this.ancestorsChain.config}`)
 
     if (this.selector) {
       console.log(`${debugIndent}  ( ${this.selector} )`)

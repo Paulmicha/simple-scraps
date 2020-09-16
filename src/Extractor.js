@@ -198,12 +198,11 @@ class Extractor {
   }
 
   /**
-   * Binds Iterable composite instances creation and scoping.
+   * Binds Iterable composite instances creation and scoping during init().
    */
   iterableFactory (spec) {
     const { type, scope, config, container } = spec
     let instance
-    let instanceParentField
 
     // Debug.
     console.log(`iterableFactory(${type})`)
@@ -223,16 +222,21 @@ class Extractor {
 
     switch (type) {
       case 'step':
-        instanceParentField = 'parent'
-
         instance = new Step(this, config)
 
-        this.steps.add(instance)
+        // Scope the selector.
+        instance.setAncestors()
+        instance.setScope(scope)
+
+        // Check if it matches at least 1 element in the page. If it does, we
+        // can add it to the collection for processing.
+        if (dom.exists(this.pageWorker.page, instance.getSelector())) {
+          this.steps.add(instance)
+        }
+
         break
 
       case 'component':
-        instanceParentField = 'container'
-
         if (container) {
           config.component = container
         }
@@ -248,14 +252,20 @@ class Extractor {
         console.log(`  component name = ${instance.getName()}`)
         instance.locate('    ')
 
-        this.extracted.add(instance)
+        // Scope the selector.
+        instance.setAncestors()
+        instance.setScope(scope)
+
+        // Check if it matches at least 1 element in the page. If it does, we
+        // can add it to the collection for processing.
+        if (dom.exists(this.pageWorker.page, instance.getSelector())) {
+          this.extracted.add(instance)
+        }
         break
 
       // The root component is like the <html> tag (it's the common ancestor
       // that will be shared by all extracted components).
       case 'rootComponent':
-        instanceParentField = 'container'
-
         if (this.isRecursive) {
           instance = new Container(this)
         } else {
@@ -265,10 +275,6 @@ class Extractor {
         this.extracted.add(instance)
         break
     }
-
-    // All iterable objects share the following initialization steps.
-    instance.setAncestors(this.getAncestors(instance, instanceParentField))
-    instance.setScope(scope)
 
     return instance
   }

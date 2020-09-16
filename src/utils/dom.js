@@ -6,6 +6,19 @@
 const minifyHtml = require('html-minifier-terser').minify
 
 /**
+ * Determines if given selector matches at least 1 element in the page.
+ */
+const exists = async (page, selector) => {
+  try {
+    /* istanbul ignore next */
+    page.$eval(selector, el => el.tagName)
+  } catch (e) {
+    return false
+  }
+  return true
+}
+
+/**
  * Extracts plain text string(s) matching given selector.
  *
  * If multiple elements match the selector, an Array will be returned, otherwise
@@ -123,6 +136,7 @@ const arrayOrItemIfSingle = (result) => {
 }
 
 module.exports = {
+  exists,
   text,
   textSingle,
   markup,
