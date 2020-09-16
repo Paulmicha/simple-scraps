@@ -6,8 +6,8 @@ const Component = require('./Component')
  * Represents a type of component that can contain other components.
  */
 class Container extends Component {
-  constructor (config) {
-    super(config)
+  constructor (extractor, config) {
+    super(extractor, config)
     this.children = []
   }
 

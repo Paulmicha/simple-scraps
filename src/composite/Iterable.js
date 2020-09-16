@@ -9,13 +9,8 @@ class Iterable {
     this.extractor = extractor
 
     this.depth = 0
-    this.scope = ''
     this.ancestors = {}
     this.ancestorsChain = {}
-
-    if (!config) {
-      config = this.extractor.rootExtractionConfig
-    }
 
     this.selector = config.selector
     this.extract = config.extract
@@ -224,11 +219,18 @@ class Iterable {
 
     const depth = this.getDepth()
     const debugIndent = prefix + '  '.repeat(depth)
+
+    let stringifiedExtract = this.extract
+    if (Array.isArray(this.extract)) {
+      stringifiedExtract = this.extract.map(e => e.as).join(', ')
+    }
+
     const debugAncestorsChain = this.constructor.name === 'Step'
       ? this.ancestorsChain.config
       : this.ancestorsChain.instance
 
-    console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: ${debugAncestorsChain}`)
+    console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: '${stringifiedExtract}' as ${this.as}`)
+    console.log(`${debugIndent}  ${debugAncestorsChain}`)
 
     if (this.selector) {
       console.log(`${debugIndent}  ( ${this.selector} )`)

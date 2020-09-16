@@ -8,6 +8,11 @@ const ExportVisitor = require('./composite/ExportVisitor')
 /**
  * Defines the process of extracting a structured object from a page.
  *
+ * A single page may contain a single entity to extract (with multiple fields),
+ * or it can contain sub-entities like components, each having their own fields
+ * or props, and which are potentially nested (i.e. components containing other
+ * sub-components).
+ *
  * Loosely inspired by the design patterns Composite, Iterator, and Visitor.
  */
 class Extractor {
@@ -204,6 +209,12 @@ class Extractor {
     const { type, config, container } = spec
     let instance
 
+    // Debug.
+    if (!config) {
+      console.log('Warning : no config passed in iterableFactory() - spec :')
+      console.log(spec)
+    }
+
     switch (type) {
       case 'step':
         instance = new Step(this, config)
@@ -231,7 +242,13 @@ class Extractor {
         } else {
           // Debug.
           console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
-          console.log(`  -> field ${instance.getField()} not added to steps collection`)
+          console.log(`  -> field ${instance.getField()} not added to the 'steps' collection`)
+
+          // TODO break deeper lookup selectors here (e.g. store last deepest
+          // scope found to stop recursion, since container element doesn't
+          // exist).
+          // @see init()
+          // @see nestExtractionConfig()
         }
 
         break
@@ -270,18 +287,27 @@ class Extractor {
         } else {
           // Debug.
           console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
-          console.log(`  -> component ${instance.getName()} not added to steps collection`)
+          console.log(`  -> component ${instance.getName()} not added to the 'extracted' collection`)
+
+          // TODO break deeper lookup selectors here (e.g. store last deepest
+          // scope found to stop recursion, since container element doesn't
+          // exist).
+          // @see init()
+          // @see nestExtractionConfig()
         }
         break
 
-      // The root component is like the <html> tag (it's the common ancestor
-      // that will be shared by all extracted components).
+      // The root component is like the <html> tag (it's the single shared
+      /// component or first ancestor of all extracted fields or components).
       case 'rootComponent':
         if (this.isRecursive) {
-          instance = new Container(this)
+          instance = new Container(this, config)
         } else {
-          instance = new Leaf(this)
+          instance = new Leaf(this, config)
         }
+
+        // Debug.
+        console.log(`iterableFactory(${type})`)
 
         this.extracted.add(instance)
         break
@@ -326,7 +352,7 @@ class Extractor {
    *   3. Nested components as field or property value (either of the page being
    *     extracted or of one of its components)
    */
-  init (configs, parent, nestingLevel) {
+  init (configs, parentConfig, nestingLevel) {
     if (!nestingLevel) {
       nestingLevel = 0
     }
@@ -344,7 +370,7 @@ class Extractor {
       //   continue
       // }
 
-      config.parent = parent
+      config.parent = parentConfig
 
       // Debug.
       console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
@@ -355,15 +381,19 @@ class Extractor {
       //   return
       // }
 
-      // If this extraction config has multiple sub-extraction configs, it must
-      // be represented by a single composite instance having 1 or more fields
-      // or properties (i.e. an instance of Component -> Container or Leaf).
+      // If this extraction config has multiple sub-extraction configs, it will
+      // result in a single component where each sub-extraction config will
+      // process one field or prop of that same component.
       if (Array.isArray(config.extract)) {
         config.component = this.iterableFactory({
           type: 'component',
-          scope: parent.selector,
           config
         })
+
+        // Debug.
+        // console.log('  config.extract is an array')
+        // console.log('  -> component :')
+        // console.log(config.component.locate('    '))
 
         config.extract.map(subExtractionConfig => {
           subExtractionConfig.parent = config
@@ -374,7 +404,7 @@ class Extractor {
 
           this.iterableFactory({
             type: 'step',
-            config
+            config: subExtractionConfig
           })
 
           // Any field or property of this group can contain nested components.
@@ -395,15 +425,14 @@ class Extractor {
         if (destination[0] === 'component') {
           config.component = this.iterableFactory({
             type: 'component',
-            container: parent.component,
-            scope: config.selector,
+            container: parentConfig.component,
             config
           })
-          parent.component.add(config.component)
+          parentConfig.component.add(config.component)
         } else {
           // Otherwise, it's a field or property belonging to the page document
           // root.
-          config.component = parent.component
+          config.component = parentConfig.component
         }
 
         this.iterableFactory({
