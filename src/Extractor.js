@@ -214,10 +214,10 @@ class Extractor {
       // -> workaround : skip init (for now). Ideally, detect if scope exists
       // on page (run CSS selector) to avoid instanciating every possible nested
       // lookup combinations.
-      if (this.detectSelfNesting(config)) {
-        console.log('init() : self nesting detected')
-        return
-      }
+      // if (this.detectSelfNesting(config)) {
+      //   console.log('init() : self nesting detected')
+      //   return
+      // }
     }
 
     switch (type) {
@@ -232,6 +232,10 @@ class Extractor {
         // can add it to the collection for processing.
         if (dom.exists(this.pageWorker.page, instance.getSelector())) {
           this.steps.add(instance)
+        } else {
+          // Debug.
+          console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
+          console.log(`  -> field ${instance.getField()} not added to steps collection`)
         }
 
         break
@@ -260,6 +264,10 @@ class Extractor {
         // can add it to the collection for processing.
         if (dom.exists(this.pageWorker.page, instance.getSelector())) {
           this.extracted.add(instance)
+        } else {
+          // Debug.
+          console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
+          console.log(`  -> component ${instance.getName()} not added to steps collection`)
         }
         break
 
@@ -328,10 +336,10 @@ class Extractor {
       // -> workaround : skip init (for now). Ideally, detect if scope exists
       // on page (run CSS selector) to avoid instanciating every possible nested
       // lookup combinations.
-      if (this.detectSelfNesting(config)) {
-        console.log('init() : self nesting detected')
-        continue
-      }
+      // if (this.detectSelfNesting(config)) {
+      //   console.log('init() : self nesting detected')
+      //   continue
+      // }
 
       config.parent = parent
 
@@ -363,7 +371,7 @@ class Extractor {
 
           // Any field or property of this group can contain nested components.
           if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-            this.nestExtractionConfig(subExtractionConfig)
+            this.nestExtractionConfig(subExtractionConfig, nestingLevel)
           }
 
           this.iterableFactory({
@@ -397,7 +405,7 @@ class Extractor {
 
         // A single field can still contain nested components.
         if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-          this.nestExtractionConfig(config)
+          this.nestExtractionConfig(config, nestingLevel)
         }
 
         this.iterableFactory({
@@ -425,36 +433,23 @@ class Extractor {
    *     "as": "entity.content"
    *   }
    */
-  nestExtractionConfig (config) {
+  nestExtractionConfig (config, nestingLevel) {
     if (Array.isArray(config.extract)) {
       config.extract.forEach(subExtractionConfig =>
         this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
         this.nestExtractionConfig(subExtractionConfig)
       )
     } else if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
-      const nestingLevel = this.getConfigNestingLevel(config)
+      // const nestingLevel = this.getConfigNestingLevel(config)
 
+      nestingLevel++
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
         // Debug.
         // console.log(`recursive call to init() at nestingLevel ${nestingLevel} :`)
         // console.log(this.nestedExtractionConfigs)
-
         this.init(this.nestedExtractionConfigs, config, nestingLevel)
       }
     }
-  }
-
-  /**
-   * Returns the "nesting level" of given extraction config object.
-   *
-   * @param {Object} config A single extraction config object.
-   */
-  getConfigNestingLevel (config) {
-    const ancestors = this.getAncestors(config)
-    if (ancestors.length) {
-      return ancestors.length - 1
-    }
-    return 0
   }
 
   /**
@@ -469,7 +464,7 @@ class Extractor {
    *       from 'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
    *         from 'components' as entity.content
    */
-  detectSelfNesting (config) {
+  /* detectSelfNesting (config) {
     let stringifiedExtract = config.extract
     if (Array.isArray(config.extract)) {
       stringifiedExtract = config.extract.map(e => e.as).join(', ')
@@ -493,7 +488,7 @@ class Extractor {
     }
 
     return false
-  }
+  } */
 
   /**
    * Debug utility.
