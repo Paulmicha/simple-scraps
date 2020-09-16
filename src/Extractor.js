@@ -359,37 +359,34 @@ class Extractor {
 
     for (let i = 0; i < configs.length; i++) {
       const config = { ...configs[i] }
-
-      // TODO (wip) circular parent references cause exponential lookups, even
-      // bound by the 'maxExtractionNestingDepth' setting.
-      // -> workaround : skip init (for now). Ideally, detect if scope exists
-      // on page (run CSS selector) to avoid instanciating every possible nested
-      // lookup combinations.
-      // if (this.detectSelfNesting(config)) {
-      //   console.log('init() : self nesting detected')
-      //   continue
-      // }
-
+      const destination = config.as.split('.')
       config.parent = parentConfig
 
       // Debug.
       console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
       this.locateConfig(config)
 
-      // TODO (wip) break memory leak.
-      // if (nestingLevel > 1 && i > 0) {
-      //   return
-      // }
+      // If a config 'extract' key is not an array and has a destination ('as'
+      // key) corresponding to a component, we assume that the component is
+      // to be extracted as a single prop component (contained in the parent
+      // config component).
+      if (destination[0] === 'component') {
+        config.component = this.iterableFactory({
+          type: 'component',
+          container: parentConfig.component,
+          config
+        })
+        parentConfig.component.add(config.component)
+      } else {
+        // Otherwise, it's a field or property belonging to the parent Container
+        // component (could be the page document root Container).
+        config.component = parentConfig.component
+      }
 
       // If this extraction config has multiple sub-extraction configs, it will
       // result in a single component where each sub-extraction config will
       // process one field or prop of that same component.
       if (Array.isArray(config.extract)) {
-        config.component = this.iterableFactory({
-          type: 'component',
-          config
-        })
-
         // Debug.
         // console.log('  config.extract is an array')
         // console.log('  -> component :')
@@ -416,25 +413,6 @@ class Extractor {
         // Otherwise, we're dealing with a single field or property.
         // It could be belonging to the page document root, or to a component
         // that has a single field setup for extraction.
-        const destination = config.as.split('.')
-
-        // If a config 'extract' key is not an array and has a destination ('as'
-        // key) corresponding to a component, we assume that the component is
-        // to be extracted as a single prop component (contained in the parent
-        // config component).
-        if (destination[0] === 'component') {
-          config.component = this.iterableFactory({
-            type: 'component',
-            container: parentConfig.component,
-            config
-          })
-          parentConfig.component.add(config.component)
-        } else {
-          // Otherwise, it's a field or property belonging to the page document
-          // root.
-          config.component = parentConfig.component
-        }
-
         this.iterableFactory({
           type: 'step',
           config

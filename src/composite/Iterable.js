@@ -120,6 +120,7 @@ class Iterable {
       i--
     }
 
+    // return ancestors
     return ancestors.reverse()
   }
 
