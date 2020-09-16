@@ -7,8 +7,8 @@ const Iterable = require('./Iterable')
  * @see src/composite/Leaf.js
  */
 class Component extends Iterable {
-  constructor (config) {
-    super(config)
+  constructor (extractor, config) {
+    super(extractor, config)
     this.container = config ? config.component : null
     this.extracted = {}
   }

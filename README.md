@@ -82,7 +82,7 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
         },
         {
           "selector": ".view-chouette-articles .c-pagination a",
-          "to": "start",
+          "to": "follow",
           "maxPagesToCrawl": 1
         }
       ]
@@ -105,7 +105,7 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
       "selector": "article.node .field-name-field-tags > a",
       "extract": "element",
       "as": "entity.tags",
-      "postprocess": "extract.ref.taxonomy.tag"
+      "emit": "extract.ref.taxonomy.tag"
     }
   ],
   "components": [
@@ -121,7 +121,7 @@ From the initial page at [www.chouette.net.br/blog](https://www.chouette.net.br/
           "selector": ".c-pimg__img",
           "extract": "element",
           "as": "component.MediaGrid.items[].image",
-          "postprocess": "extract.media.image"
+          "emit": "extract.media.image"
         },
         {
           "selector": ".c-pimg__text > h2",
@@ -178,8 +178,8 @@ Possible values for `extract` :
 
 - `text` : DOM node plain text content (without tags)
 - `markup` : DOM node inner HTML
-- `element` : return the DOM node itself (to be dealt with in a custom `postprocess` callback)
-- Array : list of sub-parts to be extracted individually (scoped by the `selector` of where it's defined), then mapped to props or reduced to string in a custom `postprocess` callback
+- `element` : return the DOM node itself (to be dealt with in a custom `emit` event listener)
+- Array : list of sub-parts to be extracted individually (scoped by the `selector` of where it's defined), then mapped to props or reduced to string in a custom `emit` event listener
 
 TODO detailed examples (input / output)
 

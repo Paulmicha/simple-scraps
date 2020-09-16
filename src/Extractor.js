@@ -42,10 +42,40 @@ class Extractor {
       this.isRecursive = true
     }
 
-    // The extraction process uses a composite tree collection to store a
-    // representation of all the selectors to extract (i.e. Step instances), and
-    // another collection for extraction results which are structured
-    // differently (Component instances -> Container, Leaf).
+    // The extraction process uses 2 composite tree collections to store :
+    //   1. all the selectors to extract (i.e. Step instances),
+    //   2. the extraction results (i.e. Component instances = Container, Leaf).
+    // This allows to run multiple selectors to extract a single component with
+    // multiple fields or properties (each selector to run corresponding to a
+    // Step instance).
+    // Example of a multi-props component :
+    // {
+    //   "selector": ".card",
+    //   "extract": [
+    //     {
+    //       "selector": "> .card-header",
+    //       "extract": "text_single",
+    //       "as": "component.Card.header"
+    //     },
+    //     {
+    //       "selector": "> .card-body > .card-title",
+    //       "extract": "text_single",
+    //       "as": "component.Card.title"
+    //     },
+    //     {
+    //       "selector": "> .card-body > .card-text",
+    //       "extract": "text_single",
+    //       "as": "component.Card.text"
+    //     }
+    //   ],
+    //   "as": "component.Card"
+    // }
+    // In this example, we have 1 component that will be processed in 4 steps :
+    // - 1 for the component itself - initially empty (if its selector
+    //   ".card" does not match anything, then nothing will be added to both
+    //   steps and extracted collection)
+    // - 3 for the component properties (i.e. each "extract" extraction config),
+    //   which will populate the initially empty component instance.
     this.steps = new Collection()
     this.iterator = this.steps.createIterator()
     this.extracted = new Collection()
@@ -55,7 +85,12 @@ class Extractor {
     // document itself. Either we have nested components configs which require
     // recursive lookups, or we simply extract 1 or more fields of the same
     // root entity.
-    this.rootComponent = this.iterableFactory({ type: 'rootComponent', scope: '' })
+    // Also define the corresponding extraction config representation.
+    this.rootExtractionConfig = { selector: '', extract: '*', as: 'root' }
+    this.rootComponent = this.iterableFactory({
+      type: 'rootComponent',
+      config: this.rootExtractionConfig
+    })
   }
 
   /**
@@ -190,7 +225,7 @@ class Extractor {
       case 'step':
         instanceParentField = 'parent'
 
-        instance = new Step(config, this.main)
+        instance = new Step(this, config)
 
         this.steps.add(instance)
         break
@@ -203,9 +238,9 @@ class Extractor {
         }
 
         if (this.isContainer(config)) {
-          instance = new Container(config)
+          instance = new Container(this, config)
         } else {
-          instance = new Leaf(config)
+          instance = new Leaf(this, config)
         }
 
         // Debug.
@@ -222,9 +257,9 @@ class Extractor {
         instanceParentField = 'container'
 
         if (this.isRecursive) {
-          instance = new Container()
+          instance = new Container(this)
         } else {
-          instance = new Leaf()
+          instance = new Leaf(this)
         }
 
         this.extracted.add(instance)
@@ -257,47 +292,6 @@ class Extractor {
       return this.main.getSetting('extractionContainerTypes').includes(config.extract)
     }
     return false
-  }
-
-  /**
-   * Returns an array of objects that represents a "nesting chain" from current
-   * depth level to the root (depth 0).
-   *
-   * @param {Object} object Any object with a field optionally containing its
-   *   parent object.
-   * @param {string} parentField (optional) The field or property containing the
-   *   parent object value. Defaults to 'parent'.
-   */
-  getAncestors (object, parentField) {
-    const ancestors = []
-    if (!parentField) {
-      parentField = 'parent'
-    }
-
-    // Debug.
-    // console.log(`getAncestors(object, '${parentField}') for ${object.constructor.name}`)
-    // console.log(`  keys: ${Object.keys(object)}`)
-    // console.log(`  object[parentField] = ${JSON.stringify(object[parentField])}`)
-
-    // TODO (wip) debug memory leak :
-    // iterableFactory(step)
-    //   'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
-    //     from 'components' as component.NavTabs.items[].content
-    //       from 'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
-    //         from 'components' as entity.content
-    let loopObject = { ...object }
-    let i = this.main.getSetting('maxExtractionNestingDepth')
-
-    while (i > 0 && loopObject[parentField]) {
-      ancestors.push(loopObject[parentField])
-      loopObject = loopObject[parentField]
-      i--
-    }
-
-    // Debug.
-    // console.log(ancestors.map(a => JSON.stringify(a)))
-
-    return ancestors.reverse()
   }
 
   /**

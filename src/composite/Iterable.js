@@ -5,15 +5,62 @@
  * @see src/composite/Component.js (-> Container, Leaf)
  */
 class Iterable {
-  constructor (config) {
+  constructor (extractor, config) {
+    this.extractor = extractor
+
     this.depth = 0
     this.scope = ''
     this.ancestors = []
     this.ancestorsChain = ''
 
-    this.selector = config ? config.selector : ''
-    this.extract = config ? config.extract : '*'
-    this.as = config ? config.as : 'root'
+    if (!config) {
+      config = this.extractor.rootExtractionConfig
+    }
+
+    this.selector = config.selector
+    this.extract = config.extract
+    this.as = config.as
+  }
+
+  /**
+   * Separates parent extraction config object reference from parent Iterable
+   * instance.
+   *
+   * This avoids infinite recursion when looking for instances of a component
+   * inside itself or one of its descendants.
+   * @see Extractor.getAncestors()
+   *
+   * @param {Object} parentConfig (optional) the extraction config the current
+   *   step is part of. Defaults to the page document root extraction config.
+   */
+  setParentConfig (parentConfig) {
+    if (parentConfig) {
+      this.parentConfig = parentConfig
+    } else {
+      this.parentConfig = this.extractor.rootExtractionConfig
+    }
+  }
+
+  getParentConfig () {
+    return this.parentConfig
+  }
+
+  /**
+   * Separates parent extraction config object reference from parent Iterable
+   * instance.
+   *
+   * This avoids infinite recursion when looking for instances of a component
+   * inside itself or one of its descendants.
+   * @see Extractor.getAncestors()
+   *
+   * @param {Iterable} parentInstance the parent Iterable instance.
+   */
+  setParentInstance (parentInstance) {
+    this.parentInstance = parentInstance
+  }
+
+  getParentInstance () {
+    return this.parentInstance
   }
 
   /**
@@ -39,6 +86,47 @@ class Iterable {
 
     // Debug.
     // console.log(`  result : ${this.getDepth()}`)
+  }
+
+  /**
+   * Returns an array of objects that represents a "nesting chain" from current
+   * depth level to the root (depth 0).
+   */
+  getAncestors (type) {
+    const ancestors = []
+    let loopObject = this.getAncestor(type, this)
+
+    if (!loopObject) {
+      return ancestors
+    }
+
+    loopObject = { ...loopObject }
+    let i = this.extractor.main.getSetting('maxExtractionNestingDepth')
+
+    while (i > 0 && loopObject) {
+      ancestors.push(loopObject)
+      loopObject = this.getAncestor(type, loopObject)
+      if (!loopObject) {
+        break
+      }
+      loopObject = { ...loopObject }
+      i--
+    }
+
+    return ancestors.reverse()
+  }
+
+  getAncestor (type, instance) {
+    switch (type) {
+      case 'config':
+        return instance.getParentConfig()
+      case 'instance':
+        return instance.getParentInstance()
+    }
+  }
+
+  getAncestorsChain () {
+    return this.ancestorsChain
   }
 
   /**

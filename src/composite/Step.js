@@ -11,17 +11,11 @@ const Iterable = require('./Iterable')
  * be exectued in Extractor.process() method.
  */
 class Step extends Iterable {
-  constructor (config, main) {
-    super(config)
-    this.parent = config.parent
+  constructor (extractor, config) {
+    super(extractor, config)
     this.component = config.component
     this.emit = config.emit
-    this.main = main
   }
-
-  // setParent (parent) {
-  //   this.parent = parent
-  // }
 
   /**
    * Overrides base class method to scope and customize lookup selectors.
@@ -44,7 +38,7 @@ class Step extends Iterable {
   setScope (scope) {
     // Detect + convert jQuery-like syntax to normal CSS selectors (injects custom
     // classes).
-    // if (this.main.getSetting('addDomQueryHelper')) {
+    // if (this.extractor.main.getSetting('addDomQueryHelper')) {
     // }
 
     if (scope) {

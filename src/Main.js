@@ -352,7 +352,7 @@ class Main extends EventEmitter {
       console.log(`${this.crawlLimits[limitID]} x ${limitID} for ${urlFound}`)
 
       // Execution depends on the "type" of link.
-      if (op.to === 'start') {
+      if (op.to === 'follow') {
         // Recursion (e.g. pager links).
         // NB. createInitialOps() will set op.type = 'crawl'.
         op.conf.url = urlFound
