@@ -224,6 +224,14 @@ class Extractor {
       case 'step':
         instance = new Step(this, config)
 
+        // Set parent / ancestors scope.
+        if (config) {
+          instance.setParentConfig(config.parent)
+          if (config.component) {
+            instance.setParentInstance(config.component)
+          }
+        }
+
         // Scope the selector.
         instance.setAncestors()
         instance.setScope(scope)
@@ -255,6 +263,14 @@ class Extractor {
         // console.log(`iterableFactory(${type}) : ${instance.getName()}`)
         console.log(`  component name = ${instance.getName()}`)
         instance.locate('    ')
+
+        // Set parent / ancestors scope.
+        if (config) {
+          instance.setParentConfig(config.parent)
+          if (config.component) {
+            instance.setParentInstance(config.component)
+          }
+        }
 
         // Scope the selector.
         instance.setAncestors()
@@ -369,15 +385,15 @@ class Extractor {
           // group of fields or properties).
           subExtractionConfig.component = config.component
 
-          // Any field or property of this group can contain nested components.
-          if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-            this.nestExtractionConfig(subExtractionConfig, nestingLevel)
-          }
-
           this.iterableFactory({
             type: 'step',
             config
           })
+
+          // Any field or property of this group can contain nested components.
+          if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
+            this.nestExtractionConfig(subExtractionConfig, nestingLevel)
+          }
         })
       } else {
         // Otherwise, we're dealing with a single field or property.
@@ -403,15 +419,15 @@ class Extractor {
           config.component = parent.component
         }
 
-        // A single field can still contain nested components.
-        if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-          this.nestExtractionConfig(config, nestingLevel)
-        }
-
         this.iterableFactory({
           type: 'step',
           config
         })
+
+        // A single field can still contain nested components.
+        if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
+          this.nestExtractionConfig(config, nestingLevel)
+        }
       }
     }
   }
@@ -445,9 +461,14 @@ class Extractor {
       nestingLevel++
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
         // Debug.
-        // console.log(`recursive call to init() at nestingLevel ${nestingLevel} :`)
+        // console.log(`recursive call to init() at nestingLevel ${nestingLevel} < ${this.main.getSetting('maxExtractionNestingDepth')} :`)
         // console.log(this.nestedExtractionConfigs)
+
         this.init(this.nestedExtractionConfigs, config, nestingLevel)
+      } else {
+        // Debug.
+        // console.log(`NO recursive call to init() at nestingLevel ${nestingLevel} < ${this.main.getSetting('maxExtractionNestingDepth')} :`)
+        // console.log(this.nestedExtractionConfigs)
       }
     }
   }
@@ -512,7 +533,7 @@ class Extractor {
         stringifiedExtract = confLoop.parent.extract.map(e => e.as).join(', ')
       }
       console.log(`${prefix.repeat(i)}  from '${stringifiedExtract}' as ${confLoop.parent.as}`)
-      confLoop = confLoop.parent
+      confLoop = { ...confLoop.parent }
       i++
     }
   }

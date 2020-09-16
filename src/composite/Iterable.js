@@ -72,9 +72,10 @@ class Iterable {
     for (let i = 0; i < types.length; i++) {
       const type = types[i]
       this.ancestors[type] = this.getAncestors(type)
+      this.ancestorsChain[type] = ''
 
       if (this.ancestors[type] && this.ancestors[type].length) {
-        this.ancestorsChain[type] += this.ancestors
+        this.ancestorsChain[type] = this.ancestors[type]
           .map(e => e.as)
           .filter(e => e && e.length)
           .join(' <- ')
@@ -84,6 +85,10 @@ class Iterable {
       }
       this.ancestorsChain[type] += this.as
     }
+
+    // Debug.
+    console.log('setAncestors() :')
+    console.log(this.ancestorsChain)
 
     this.setDepth()
 
@@ -126,9 +131,9 @@ class Iterable {
   getAncestor (type, instance) {
     switch (type) {
       case 'config':
-        return instance.getParentConfig()
+        return instance.getParentConfig && instance.getParentConfig()
       case 'instance':
-        return instance.getParentInstance()
+        return instance.getParentInstance && instance.getParentInstance()
     }
   }
 
