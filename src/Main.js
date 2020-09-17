@@ -397,8 +397,8 @@ class Main extends EventEmitter {
     this.emit('alter.extraction.result', entity, extractor)
 
     // Debug.
-    console.log(`Main - resulting entity object (${extractor.entityType}.${extractor.bundle}) :`)
-    console.log(entity)
+    // console.log(`Main - resulting entity object (${extractor.entityType}.${extractor.bundle}) :`)
+    // console.log(entity)
     // console.log(`Main - resulting entity object (${entityType}.${bundle}) *content[1].props* :`)
     // console.log(entity.content[1].props)
 

@@ -14,6 +14,9 @@ const ExportVisitor = require('./composite/ExportVisitor')
  * sub-components).
  *
  * Loosely inspired by the design patterns Composite, Iterator, and Visitor.
+ *
+ * Collection items are all sub-classes of Iterable, which are traversable via
+ * Iterator and exportable via ExportVisitor.
  */
 class Extractor {
   constructor (op, pageWorker, main) {
@@ -220,9 +223,6 @@ class Extractor {
         instance = new Step(this, config)
 
         // Set parent / ancestors scope.
-        if (config.parentStep) {
-          instance.setParentConfig(config.parentStep)
-        }
         if (config.component) {
           instance.setParentComponent(config.component)
         }
@@ -236,22 +236,6 @@ class Extractor {
         // instance.locate('  ')
 
         this.steps.add(instance)
-
-        // Check if it matches at least 1 element in the page. If it does, we
-        // can add it to the collection for processing.
-        // if (dom.exists(this.pageWorker.page, instance.getSelector())) {
-        //   this.steps.add(instance)
-        // } else {
-        //   // Debug.
-        //   console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
-        //   console.log(`  -> field ${instance.getField()} not added to the 'steps' collection`)
-
-        //   // TODO break deeper lookup selectors here (e.g. store last deepest
-        //   // scope found to stop recursion, since container element doesn't
-        //   // exist).
-        //   // @see init()
-        //   // @see nestExtractionConfig()
-        // }
         break
 
       case 'component':
@@ -266,9 +250,6 @@ class Extractor {
         }
 
         // Set parent / ancestors scope.
-        if (config.parentStep) {
-          instance.setParentConfig(config.parentStep)
-        }
         if (config.component) {
           instance.setParentComponent(config.component)
         }
@@ -282,22 +263,6 @@ class Extractor {
         // instance.locate('  ')
 
         this.extracted.add(instance)
-
-        // Check if it matches at least 1 element in the page. If it does, we
-        // can add it to the collection for processing.
-        // if (dom.exists(this.pageWorker.page, instance.getSelector())) {
-        //   this.extracted.add(instance)
-        // } else {
-        //   // Debug.
-        //   console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
-        //   console.log(`  -> component ${instance.getName()} not added to the 'extracted' collection`)
-
-        //   // TODO break deeper lookup selectors here (e.g. store last deepest
-        //   // scope found to stop recursion, since container element doesn't
-        //   // exist).
-        //   // @see init()
-        //   // @see nestExtractionConfig()
-        // }
         break
 
       // The root component is like the <html> tag (it's the single shared
@@ -343,9 +308,6 @@ class Extractor {
   /**
    * Populates the composite collection based on extraction configs.
    *
-   * Step class instances are the Collection items which are traversable via
-   * Iterator and exportable via ExportVisitor.
-   *
    * We need to obtain instances of composite Component classes (Leaf and
    * Container) to represent what will be extracted (in as many steps as there
    * are selectors to run - i.e. one step per Component field or prop) :
@@ -370,7 +332,7 @@ class Extractor {
       }
 
       // Debug.
-      console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
+      // console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
       // this.locateConfig(config)
 
       // If a config 'extract' key is not an array and has a destination ('as'
@@ -618,6 +580,7 @@ class Extractor {
     // Debug.
     // console.log(`${debugIndent || ''}step() ${field} for ${step.as}`)
     // console.log(`${debugIndent || ''}  ${step.selector}`)
+    console.log(step.locate('process() :'))
 
     // Support fields containing multiple items with props.
     if (Array.isArray(step.extract)) {
@@ -644,11 +607,11 @@ class Extractor {
       }
 
       // Debug.
-      // console.log(`Children of ${component.getName()} :`)
-      // children.forEach(child => {
-      //   console.log(`  ${child.getName()}`)
-      //   console.log(child.extracted)
-      // })
+      console.log(`Children of ${component.getName()} :`)
+      children.forEach(child => {
+        child.locate('  child :')
+        console.log(`  child.extracted = ${JSON.stringify(child.extracted)}`)
+      })
 
       component.setField(field, children.map(child => {
         return { c: child.getName(), props: child.extracted }

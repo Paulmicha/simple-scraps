@@ -13,20 +13,29 @@ const Iterable = require('./Iterable')
 class Step extends Iterable {
   constructor (extractor, config) {
     super(extractor, config)
-    this.component = config.component
+    // this.component = config.component
     this.emit = config.emit
   }
 
   getField () {
+    let field = ''
     const destination = this.as.split('.')
+
     if (destination.length > 2) {
-      return destination[2]
+      field = destination[2]
+    } else {
+      field = destination[1]
     }
-    return destination[1]
+
+    if (field.includes('[]')) {
+      field = field.replace('[]', '')
+    }
+
+    return field
   }
 
   getComponent () {
-    return this.component
+    return this.getParentComponent()
   }
 }
 
