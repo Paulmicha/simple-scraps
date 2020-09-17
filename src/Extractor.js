@@ -91,7 +91,7 @@ class Extractor {
     // recursive lookups, or we simply extract 1 or more fields of the same
     // root entity.
     // Also define the corresponding extraction config representation.
-    this.rootExtractionConfig = { selector: '', extract: '*', as: 'rootComponent' }
+    this.rootExtractionConfig = { selector: ':root', extract: '*', as: 'rootComponent' }
     this.rootComponent = this.iterableFactory({
       type: 'rootComponent',
       config: this.rootExtractionConfig
@@ -237,20 +237,19 @@ class Extractor {
 
         // Check if it matches at least 1 element in the page. If it does, we
         // can add it to the collection for processing.
-        if (dom.exists(this.pageWorker.page, instance.getSelector())) {
-          this.steps.add(instance)
-        } else {
-          // Debug.
-          console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
-          console.log(`  -> field ${instance.getField()} not added to the 'steps' collection`)
+        // if (dom.exists(this.pageWorker.page, instance.getSelector())) {
+        //   this.steps.add(instance)
+        // } else {
+        //   // Debug.
+        //   console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
+        //   console.log(`  -> field ${instance.getField()} not added to the 'steps' collection`)
 
-          // TODO break deeper lookup selectors here (e.g. store last deepest
-          // scope found to stop recursion, since container element doesn't
-          // exist).
-          // @see init()
-          // @see nestExtractionConfig()
-        }
-
+        //   // TODO break deeper lookup selectors here (e.g. store last deepest
+        //   // scope found to stop recursion, since container element doesn't
+        //   // exist).
+        //   // @see init()
+        //   // @see nestExtractionConfig()
+        // }
         break
 
       case 'component':
@@ -282,19 +281,19 @@ class Extractor {
 
         // Check if it matches at least 1 element in the page. If it does, we
         // can add it to the collection for processing.
-        if (dom.exists(this.pageWorker.page, instance.getSelector())) {
-          this.extracted.add(instance)
-        } else {
-          // Debug.
-          console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
-          console.log(`  -> component ${instance.getName()} not added to the 'extracted' collection`)
+        // if (dom.exists(this.pageWorker.page, instance.getSelector())) {
+        //   this.extracted.add(instance)
+        // } else {
+        //   // Debug.
+        //   console.log(`  the selector '${instance.getSelector()}' does not exist in page`)
+        //   console.log(`  -> component ${instance.getName()} not added to the 'extracted' collection`)
 
-          // TODO break deeper lookup selectors here (e.g. store last deepest
-          // scope found to stop recursion, since container element doesn't
-          // exist).
-          // @see init()
-          // @see nestExtractionConfig()
-        }
+        //   // TODO break deeper lookup selectors here (e.g. store last deepest
+        //   // scope found to stop recursion, since container element doesn't
+        //   // exist).
+        //   // @see init()
+        //   // @see nestExtractionConfig()
+        // }
         break
 
       // The root component is like the <html> tag (it's the single shared
@@ -352,7 +351,7 @@ class Extractor {
    *   3. Nested components as field or property value (either of the page being
    *     extracted or of one of its components)
    */
-  init (configs, parentConfig, nestingLevel) {
+  async init (configs, parentConfig, nestingLevel) {
     if (!nestingLevel) {
       nestingLevel = 0
     }
@@ -392,35 +391,36 @@ class Extractor {
         // console.log('  -> component :')
         // console.log(config.component.locate('    '))
 
-        config.extract.map(subExtractionConfig => {
+        for (let j = 0; j < config.extract.length; j++) {
+          const subExtractionConfig = config.extract[j]
           subExtractionConfig.parent = config
 
           // All sub-extraction configs are "working" on the same instance (the
           // group of fields or properties).
           subExtractionConfig.component = config.component
 
-          this.iterableFactory({
+          const step = this.iterableFactory({
             type: 'step',
             config: subExtractionConfig
           })
 
           // Any field or property of this group can contain nested components.
           if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-            this.nestExtractionConfig(subExtractionConfig, nestingLevel)
+            await this.nestExtractionConfig(subExtractionConfig, nestingLevel, step)
           }
-        })
+        }
       } else {
         // Otherwise, we're dealing with a single field or property.
         // It could be belonging to the page document root, or to a component
         // that has a single field setup for extraction.
-        this.iterableFactory({
+        const step = this.iterableFactory({
           type: 'step',
           config
         })
 
         // A single field can still contain nested components.
         if (this.isRecursive && nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-          this.nestExtractionConfig(config, nestingLevel)
+          await this.nestExtractionConfig(config, nestingLevel, step)
         }
       }
     }
@@ -442,27 +442,20 @@ class Extractor {
    *     "extract": "components",
    *     "as": "entity.content"
    *   }
+   *   // In this example, the 'content' field of the entity to extracted would
+   *   // trigger a recursive lookup of all components defined elsewhere in the
+   *   // main config under the 'components' key.
    */
-  nestExtractionConfig (config, nestingLevel) {
-    if (Array.isArray(config.extract)) {
-      config.extract.forEach(subExtractionConfig =>
-        this.main.getSetting('extractionContainerTypes').includes(subExtractionConfig.extract) &&
-        this.nestExtractionConfig(subExtractionConfig, nestingLevel)
-      )
-    } else if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
-      // const nestingLevel = this.getConfigNestingLevel(config)
-
+  async nestExtractionConfig (config, nestingLevel, step) {
+    if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
+      // Check if step selector matches at least 1 element in the page.
+      const scopeExists = await dom.exists(this.pageWorker.page, step.getSelector())
+      if (!scopeExists) {
+        return
+      }
       nestingLevel++
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-        // Debug.
-        // console.log(`recursive call to init() at nestingLevel ${nestingLevel} < ${this.main.getSetting('maxExtractionNestingDepth')} :`)
-        // console.log(this.nestedExtractionConfigs)
-
-        this.init(this.nestedExtractionConfigs, config, nestingLevel)
-      } else {
-        // Debug.
-        // console.log(`NO recursive call to init() at nestingLevel ${nestingLevel} < ${this.main.getSetting('maxExtractionNestingDepth')} :`)
-        // console.log(this.nestedExtractionConfigs)
+        await this.init(this.nestedExtractionConfigs, config, nestingLevel)
       }
     }
   }
@@ -539,7 +532,7 @@ class Extractor {
     // 1. Populate the composite collection based on extraction configs.
     // Start with root configs on root element, then recurse (if needed).
     // @see nestExtractionConfig()
-    this.init(this.rootExtractionConfigs, {
+    await this.init(this.rootExtractionConfigs, {
       component: this.rootComponent,
       selector: ':root'
     })

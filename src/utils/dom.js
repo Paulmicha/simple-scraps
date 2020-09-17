@@ -7,15 +7,18 @@ const minifyHtml = require('html-minifier-terser').minify
 
 /**
  * Determines if given selector matches at least 1 element in the page.
+ *
+ * See https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pageselector
  */
 const exists = async (page, selector) => {
-  try {
-    /* istanbul ignore next */
-    page.$eval(selector, el => el.tagName)
-  } catch (e) {
-    return false
-  }
-  return true
+  let result = false
+
+  /* istanbul ignore next */
+  await page.waitForSelector(selector, { timeout: 500 })
+    .then(() => { result = true })
+    .catch(() => { result = false })
+
+  return result
 }
 
 /**

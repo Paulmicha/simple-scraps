@@ -112,11 +112,11 @@ class Iterable {
 
     while (i > 0 && loopObject) {
       ancestors.push(loopObject)
-      loopObject = this.getAncestor(type, loopObject)
-      if (!loopObject) {
+      const innerLoopObject = this.getAncestor(type, loopObject)
+      if (!innerLoopObject) {
         break
       }
-      loopObject = { ...loopObject }
+      loopObject = { ...innerLoopObject }
       i--
     }
 
