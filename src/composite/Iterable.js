@@ -58,8 +58,14 @@ class Iterable {
   setParentComponent (parentInstance) {
     // Debug.
     // console.log(`setParentConfig(${parentInstance.locate()})`)
-    console.log(`setParentComponent() : ${parentInstance.getName()} (${parentInstance.constructor.name})`)
-    console.log(`  of : ${this.constructor.name} '${this.extract}' as ${this.as}`)
+    if (this.constructor.name !== 'Step') {
+      console.log(`setParentComponent() of ${this.getName()} (${this.constructor.name})`)
+      console.log(`  -> ${parentInstance.getName()} (${parentInstance.constructor.name})`)
+      const debugAncestorsChain = parentInstance.getAncestorsChain('container')
+      if (debugAncestorsChain) {
+        console.log(`    ${parentInstance.getAncestorsChain('container')}`)
+      }
+    }
 
     this.parentInstance = parentInstance
   }
@@ -93,7 +99,7 @@ class Iterable {
       if (this.ancestors[type] && this.ancestors[type].length) {
         this.ancestorsChain[type] = this.ancestors[type]
           .map(e => e.as)
-          .filter(e => e && e.length)
+          // .filter(e => e && e.length)
           .join(' <- ')
         if (this.ancestorsChain[type].length) {
           this.ancestorsChain[type] += ' <- '
@@ -145,8 +151,13 @@ class Iterable {
     // console.log(`getAncestors(${type}) for ${this.constructor.name} '${this.extract}' as ${this.as}`)
     // console.log(ancestors.map(a => a.locate('')))
     // console.log(ancestors.map(a => `${a.constructor.name} '${a.extract}' as ${a.as}`))
-    if (!ancestors.length) {
-      console.log(`Warning : no ancestors (${type}) for lv.${this.getDepth()} ${this.constructor.name} '${this.extract}' as ${this.as}`)
+    if (this.constructor.name !== 'Step' && type === 'container') {
+      console.log(`getAncestors() of ${this.getName()} (${this.constructor.name})`)
+      if (!ancestors.length) {
+        console.log(`Warning : no ancestors (${type}) at lv.${this.getDepth()}`)
+      } else {
+        console.log(ancestors.map(a => `${a.getName()} (${a.constructor.name})`))
+      }
     }
 
     // return ancestors.reverse()
