@@ -101,11 +101,11 @@ class Iterable {
           .map(e => e.as)
           // .filter(e => e && e.length)
           .join(' <- ')
-        if (this.ancestorsChain[type].length) {
-          this.ancestorsChain[type] += ' <- '
-        }
+        // if (this.ancestorsChain[type].length) {
+          // this.ancestorsChain[type] += ' <- '
+        // }
       }
-      this.ancestorsChain[type] += this.as
+      // this.ancestorsChain[type] += this.as
     }
 
     // Debug.
@@ -271,12 +271,27 @@ class Iterable {
       stringifiedExtract = this.extract.map(e => e.as).join(', ')
     }
 
-    const debugAncestorsChain = this.constructor.name === 'Step'
-      ? this.ancestorsChain.config
-      : this.ancestorsChain.container
+    // const debugAncestorsChain = this.constructor.name === 'Step'
+    //   ? this.ancestorsChain.config
+    //   : this.ancestorsChain.container
 
-    console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: '${stringifiedExtract}' as ${this.as}`)
-    console.log(`${debugIndent}  ${debugAncestorsChain}`)
+    // console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: '${stringifiedExtract}' as ${this.as}`)
+    // console.log(`${debugIndent}  ${debugAncestorsChain}`)
+
+    if (this.constructor.name !== 'Step') {
+      console.log(`${debugIndent}lv.${depth} ${this.getName()} (${this.constructor.name})`)
+      const debugAncestorsChain = this.getAncestorsChain('container')
+      if (debugAncestorsChain) {
+        console.log(`${debugIndent}  ${debugAncestorsChain}`)
+      }
+    } else {
+      console.log(`${debugIndent}lv.${depth} Step : extract ${this.getField()} (${stringifiedExtract})`)
+      // const debugAncestorsChain = this.getAncestorsChain('config')
+      // if (debugAncestorsChain) {
+      //   console.log(`${debugIndent}  ${debugAncestorsChain}`)
+      // }
+      console.log(`${debugIndent}  for component ${this.getComponent().locate(debugIndent + '    ')}`)
+    }
 
     if (this.selector) {
       console.log(`${debugIndent}  ( ${this.selector} )`)
