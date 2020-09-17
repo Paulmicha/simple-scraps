@@ -29,6 +29,11 @@ class Iterable {
    *   step is part of. Defaults to the page document root extraction config.
    */
   setParentConfig (parentConfig) {
+    // Debug.
+    // console.log(`setParentConfig(${parentConfig.locate()})`)
+    // console.log(`setParentConfig(${`${parentConfig.constructor.name} '${parentConfig.extract}' as ${parentConfig.as}`})`)
+    // console.log(`  of : ${this.constructor.name} '${this.extract}' as ${this.as}`)
+
     if (parentConfig) {
       this.parentConfig = parentConfig
     } else {
@@ -50,19 +55,35 @@ class Iterable {
    *
    * @param {Iterable} parentInstance the parent Iterable instance.
    */
-  setParentInstance (parentInstance) {
+  setParentComponent (parentInstance) {
+    // Debug.
+    // console.log(`setParentConfig(${parentInstance.locate()})`)
+    console.log(`setParentComponent() : ${parentInstance.getName()} (${parentInstance.constructor.name})`)
+    console.log(`  of : ${this.constructor.name} '${this.extract}' as ${this.as}`)
+
     this.parentInstance = parentInstance
   }
 
-  getParentInstance () {
+  getParentComponent () {
     return this.parentInstance
+  }
+
+  getparent (type, instance) {
+    try {
+      switch (type) {
+        case 'config':
+          return instance.getParentConfig()
+        case 'container':
+          return instance.getParentComponent()
+      }
+    } catch (e) {}
   }
 
   /**
    * Base ancestors + ancestorsChain props setter.
    */
   setAncestors () {
-    const types = ['config', 'instance']
+    const types = ['config', 'container']
 
     for (let i = 0; i < types.length; i++) {
       const type = types[i]
@@ -96,41 +117,40 @@ class Iterable {
    * depth level to the root (depth 0).
    */
   getAncestors (type) {
+    // Debug.
+    // console.log(`getAncestors(${type}) for ${this.constructor.name} '${this.extract}' as ${this.as}`)
+
+    // Memoization.
     if (this.ancestors[type]) {
+      // Debug.
+      // console.log(this.ancestors[type].map(a => a.locate('')))
+      // console.log(this.ancestors[type].map(a => `${a.constructor.name} '${a.extract}' as ${a.as}`))
+
       return this.ancestors[type]
     }
 
     const ancestors = []
-    let loopObject = this.getAncestor(type, this)
 
-    if (!loopObject) {
-      return ancestors
-    }
-
-    loopObject = { ...loopObject }
-    let i = this.extractor.main.getSetting('maxExtractionNestingDepth')
-
-    while (i > 0 && loopObject) {
-      ancestors.push(loopObject)
-      const innerLoopObject = this.getAncestor(type, loopObject)
-      if (!innerLoopObject) {
-        break
+    const loopThroughAncestors = (current) => {
+      const parent = this.getparent(type, current)
+      if (parent) {
+        ancestors.push(parent)
+        loopThroughAncestors(parent)
       }
-      loopObject = { ...innerLoopObject }
-      i--
     }
 
-    // return ancestors
-    return ancestors.reverse()
-  }
+    loopThroughAncestors(this)
 
-  getAncestor (type, instance) {
-    switch (type) {
-      case 'config':
-        return instance.getParentConfig && instance.getParentConfig()
-      case 'instance':
-        return instance.getParentInstance && instance.getParentInstance()
+    // Debug.
+    // console.log(`getAncestors(${type}) for ${this.constructor.name} '${this.extract}' as ${this.as}`)
+    // console.log(ancestors.map(a => a.locate('')))
+    // console.log(ancestors.map(a => `${a.constructor.name} '${a.extract}' as ${a.as}`))
+    if (!ancestors.length) {
+      console.log(`Warning : no ancestors (${type}) for lv.${this.getDepth()} ${this.constructor.name} '${this.extract}' as ${this.as}`)
     }
+
+    // return ancestors.reverse()
+    return ancestors
   }
 
   getAncestorsChain (type) {
@@ -152,11 +172,17 @@ class Iterable {
       return
     }
 
-    const configAncestors = this.getAncestors('config')
-    if (configAncestors.length && configAncestors.length > 2) {
-      this.depth = configAncestors.length - 2
+    const configAncestors = this.getAncestors('container')
+
+    // if (configAncestors.length && configAncestors.length > 2) {
+    //   this.depth = configAncestors.length - 2
+    //   return
+    // }
+    if (configAncestors.length) {
+      this.depth = configAncestors.length
       return
     }
+
     this.depth = 0
   }
 
@@ -193,11 +219,19 @@ class Iterable {
       return
     }
 
-    const parentConfig = this.getParentConfig()
+    // const parentConfig = this.getParentConfig()
 
-    if (parentConfig && parentConfig.selector) {
-      if (parentConfig.selector.length && parentConfig.selector !== ':root') {
-        this.selector = `${parentConfig.selector} ${this.selector}`
+    // if (parentConfig && parentConfig.selector) {
+    //   if (parentConfig.selector.length && parentConfig.selector !== ':root') {
+    //     this.selector = `${parentConfig.selector} ${this.selector}`
+    //   }
+    // }
+
+    const parentComponent = this.getParentComponent()
+
+    if (parentComponent && parentComponent.selector) {
+      if (parentComponent.selector.length && parentComponent.selector !== ':root') {
+        this.selector = `${parentComponent.selector} ${this.selector}`
       }
     }
   }
@@ -228,7 +262,7 @@ class Iterable {
 
     const debugAncestorsChain = this.constructor.name === 'Step'
       ? this.ancestorsChain.config
-      : this.ancestorsChain.instance
+      : this.ancestorsChain.container
 
     console.log(`${debugIndent}lv.${depth} ${this.constructor.name}: '${stringifiedExtract}' as ${this.as}`)
     console.log(`${debugIndent}  ${debugAncestorsChain}`)

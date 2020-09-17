@@ -10,11 +10,11 @@ const minifyHtml = require('html-minifier-terser').minify
  *
  * See https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pageselector
  */
-const exists = async (page, selector) => {
+const exists = async (page, selector, timeout) => {
   let result = false
 
   /* istanbul ignore next */
-  await page.waitForSelector(selector, { timeout: 500 })
+  await page.waitForSelector(selector, { timeout })
     .then(() => { result = true })
     .catch(() => { result = false })
 

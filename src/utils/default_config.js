@@ -32,6 +32,7 @@ const setting = (key) => {
   defaults.minifyExtractedHtml = true
   defaults.extractionContainerTypes = ['components']
   defaults.maxExtractionNestingDepth = 9
+  defaults.selectorExistsTimeout = 150
 
   if (key in defaults) {
     return defaults[key]

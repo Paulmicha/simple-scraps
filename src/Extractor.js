@@ -220,11 +220,11 @@ class Extractor {
         instance = new Step(this, config)
 
         // Set parent / ancestors scope.
-        if (config) {
-          instance.setParentConfig(config.parent)
-          if (config.component) {
-            instance.setParentInstance(config.component)
-          }
+        if (config.parentStep) {
+          instance.setParentConfig(config.parentStep)
+        }
+        if (config.component) {
+          instance.setParentComponent(config.component)
         }
 
         // Scope the selector.
@@ -232,8 +232,10 @@ class Extractor {
         instance.scopeSelector()
 
         // Debug.
-        console.log(`iterableFactory(${type})`)
-        instance.locate('  ')
+        // console.log(`iterableFactory(${type})`)
+        // instance.locate('  ')
+
+        this.steps.add(instance)
 
         // Check if it matches at least 1 element in the page. If it does, we
         // can add it to the collection for processing.
@@ -264,11 +266,11 @@ class Extractor {
         }
 
         // Set parent / ancestors scope.
-        if (config) {
-          instance.setParentConfig(config.parent)
-          if (config.component) {
-            instance.setParentInstance(config.component)
-          }
+        if (config.parentStep) {
+          instance.setParentConfig(config.parentStep)
+        }
+        if (config.component) {
+          instance.setParentComponent(config.component)
         }
 
         // Scope the selector.
@@ -276,8 +278,10 @@ class Extractor {
         instance.scopeSelector()
 
         // Debug.
-        console.log(`iterableFactory(${type}) : ${instance.getName()}`)
-        instance.locate('  ')
+        // console.log(`iterableFactory(${type}) : ${instance.getName()}`)
+        // instance.locate('  ')
+
+        this.extracted.add(instance)
 
         // Check if it matches at least 1 element in the page. If it does, we
         // can add it to the collection for processing.
@@ -306,7 +310,7 @@ class Extractor {
         }
 
         // Debug.
-        console.log(`iterableFactory(${type})`)
+        // console.log(`iterableFactory(${type})`)
 
         this.extracted.add(instance)
         break
@@ -351,7 +355,7 @@ class Extractor {
    *   3. Nested components as field or property value (either of the page being
    *     extracted or of one of its components)
    */
-  async init (configs, parentConfig, nestingLevel) {
+  async init (configs, parentConfig, nestingLevel, parentStep) {
     if (!nestingLevel) {
       nestingLevel = 0
     }
@@ -361,9 +365,13 @@ class Extractor {
       const destination = config.as.split('.')
       config.parent = parentConfig
 
+      if (parentStep) {
+        config.parentStep = parentStep
+      }
+
       // Debug.
       console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
-      this.locateConfig(config)
+      // this.locateConfig(config)
 
       // If a config 'extract' key is not an array and has a destination ('as'
       // key) corresponding to a component, we assume that the component is
@@ -449,13 +457,17 @@ class Extractor {
   async nestExtractionConfig (config, nestingLevel, step) {
     if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
       // Check if step selector matches at least 1 element in the page.
-      const scopeExists = await dom.exists(this.pageWorker.page, step.getSelector())
+      const scopeExists = await dom.exists(
+        this.pageWorker.page,
+        step.getSelector(),
+        this.main.getSetting('selectorExistsTimeout')
+      )
       if (!scopeExists) {
         return
       }
       nestingLevel++
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
-        await this.init(this.nestedExtractionConfigs, config, nestingLevel)
+        await this.init(this.nestedExtractionConfigs, config, nestingLevel, step)
       }
     }
   }
@@ -604,10 +616,8 @@ class Extractor {
     const field = step.getField()
 
     // Debug.
-    // if (config.depth >= 3) {
-    console.log(`${debugIndent || ''}step() ${field} for ${step.as}`)
-    console.log(`${debugIndent || ''}  ${step.selector}`)
-    // }
+    // console.log(`${debugIndent || ''}step() ${field} for ${step.as}`)
+    // console.log(`${debugIndent || ''}  ${step.selector}`)
 
     // Support fields containing multiple items with props.
     if (Array.isArray(step.extract)) {
@@ -617,7 +627,7 @@ class Extractor {
     }
 
     // Debug.
-    console.log(`${debugIndent || ''}  extracting ${step.extract}`)
+    // console.log(`${debugIndent || ''}  extracting ${step.extract}`)
 
     // When the 'extract' value is a container type, the component has to be
     // an instance of a composite Container (with children).
