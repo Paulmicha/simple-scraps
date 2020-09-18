@@ -15,6 +15,7 @@ class Iterable {
     this.selector = config.selector
     this.extract = config.extract
     this.as = config.as
+    this.parentStep = config.parentStep
   }
 
   /**
@@ -159,6 +160,17 @@ class Iterable {
         this.selector = `${parentComponent.selector} ${this.selector}`
       }
     }
+
+    // When config.parentStep is set, it means we are in a recursive call via a
+    // field or prop containing components.
+    // The selector scoping relies on Component ancestors chain, but their
+    // selectors will not have any trace of the containing field selector, if it
+    // is set.
+    // This can break nested components lookups if we have someting like :
+    // 'body > main' in the 1st depth level -> Apply only for 1st depth level.
+    if (this.constructor.name !== 'Step' && this.parentStep && this.getDepth() === 1) {
+      this.selector = `${this.parentStep.getSelector()} ${this.selector}`
+    }
   }
 
   setSelector (selector) {
@@ -186,14 +198,10 @@ class Iterable {
     }
 
     if (this.constructor.name !== 'Step') {
-      console.log(`${debugIndent}lv.${depth} ${this.getName()} (${this.constructor.name})`)
-      const debugAncestorsChain = this.getAncestorsChain()
-      if (debugAncestorsChain) {
-        console.log(`${debugIndent}  ${debugAncestorsChain}`)
-      }
+      console.log(`${debugIndent}lv.${depth} ${this.getName()} (${this.constructor.name}) <- ${this.getAncestorsChain()}`)
     } else {
       console.log(`${debugIndent}lv.${depth} Step : prop '${this.getField()}' (${stringifiedExtract})`)
-      this.getComponent().locate(debugIndent + 'for component :')
+      this.getComponent().locate(debugIndent + 'of :')
     }
 
     if (this.selector) {

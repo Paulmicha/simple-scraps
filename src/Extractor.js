@@ -311,11 +311,17 @@ class Extractor {
    * We need to obtain instances of composite Component classes (Leaf and
    * Container) to represent what will be extracted (in as many steps as there
    * are selectors to run - i.e. one step per Component field or prop) :
+   *
    *   1. Single fields or properties of the main entity being extracted
    *     (because 1 Extractor works on 1 open page = 1 resulting object)
    *   2. Groups of multiple fields or properties (e.g. a component)
    *   3. Nested components as field or property value (either of the page being
    *     extracted or of one of its components)
+   *
+   * If a config 'extract' key is not an array and has a destination ('as' key)
+   * corresponding to a component, we assume that the component is to be
+   * extracted as a single prop component (contained in the parent config
+   * component).
    */
   async init (configs, parentConfig, nestingLevel, parentStep) {
     if (!nestingLevel) {
@@ -333,12 +339,11 @@ class Extractor {
 
       // Debug.
       // console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
-      // this.locateConfig(config)
 
-      // If a config 'extract' key is not an array and has a destination ('as'
-      // key) corresponding to a component, we assume that the component is
-      // to be extracted as a single prop component (contained in the parent
-      // config component).
+      // TODO (evol) since we have a setting to customize the container types,
+      // we should alo have a way to specify the corresponding "destination".
+      // e.g. reuse 'extractionContainerTypes' and allow it to contain either an
+      // array of trings (like now) or (todo) an array of mapping objects ?
       if (destination[0] === 'component') {
         config.component = this.iterableFactory({
           type: 'component',
@@ -409,12 +414,16 @@ class Extractor {
    *   // recursive calls to this.init() - if 'components' is part of the
    *   // 'extractionContainerTypes' setting, which is the case by default :
    *   {
+   *     "selector": "body > main",
    *     "extract": "components",
    *     "as": "entity.content"
    *   }
    *   // In this example, the 'content' field of the entity to extracted would
    *   // trigger a recursive lookup of all components defined elsewhere in the
    *   // main config under the 'components' key.
+   *   // When the 'selector' key is set, it constrains the components lookup
+   *   // within its scope - i.e. it will only match descendants of the
+   *   // element(s) corresponding to the selector.
    */
   async nestExtractionConfig (config, nestingLevel, step) {
     if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
@@ -431,71 +440,6 @@ class Extractor {
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
         await this.init(this.nestedExtractionConfigs, config, nestingLevel, step)
       }
-    }
-  }
-
-  /**
-   * Workaround memory leak.
-   *
-   * TODO figure out why getAncestors() seems to create a memory leak when
-   * looking for instances of a component inside itself, e.g. :
-   *
-   * iterableFactory(step)
-   *   'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
-   *     from 'components' as component.NavTabs.items[].content
-   *       from 'component.NavTabs.items[].title, component.NavTabs.items[].content' as component.NavTabs
-   *         from 'components' as entity.content
-   */
-  /* detectSelfNesting (config) {
-    let stringifiedExtract = config.extract
-    if (Array.isArray(config.extract)) {
-      stringifiedExtract = config.extract.map(e => e.as).join(', ')
-    }
-    const currentStep = `extract '${stringifiedExtract}' as ${config.as}`
-
-    let i = this.main.getSetting('maxExtractionNestingDepth')
-    let confLoop = { ...config }
-
-    while (i > 0 && confLoop.parent && confLoop.parent.as) {
-      stringifiedExtract = confLoop.parent.extract
-      if (Array.isArray(confLoop.parent.extract)) {
-        stringifiedExtract = confLoop.parent.extract.map(e => e.as).join(', ')
-      }
-
-      if (currentStep === `extract '${stringifiedExtract}' as ${confLoop.parent.as}`) {
-        return true
-      }
-      confLoop = { ...confLoop.parent }
-      i--
-    }
-
-    return false
-  } */
-
-  /**
-   * Debug utility.
-   */
-  locateConfig (config, prefix) {
-    if (!prefix) {
-      prefix = '  '
-    }
-
-    let stringifiedExtract = config.extract
-    if (Array.isArray(config.extract)) {
-      stringifiedExtract = config.extract.map(e => e.as).join(', ')
-    }
-    console.log(`${prefix}'${stringifiedExtract}' as ${config.as}`)
-
-    let i = 0
-    let confLoop = { ...config }
-    while (i < this.main.getSetting('maxExtractionNestingDepth') && confLoop.parent && confLoop.parent.as) {
-      stringifiedExtract = confLoop.parent.extract
-      if (Array.isArray(confLoop.parent.extract)) {
-        stringifiedExtract = confLoop.parent.extract.map(e => e.as).join(', ')
-      }
-      console.log(`${prefix.repeat(i)}  from '${stringifiedExtract}' as ${confLoop.parent.as}`)
-      confLoop = { ...confLoop.parent }
-      i++
     }
   }
 
@@ -607,10 +551,10 @@ class Extractor {
       }
 
       // Debug.
-      console.log(`Children of ${component.getName()} :`)
+      console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
       children.forEach(child => {
-        child.locate('  child :')
-        console.log(`  child.extracted = ${JSON.stringify(child.extracted)}`)
+        child.locate('    child :')
+        console.log(`    child.extracted = ${JSON.stringify(child.extracted)}`)
       })
 
       component.setField(field, children.map(child => {
