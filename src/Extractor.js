@@ -350,17 +350,19 @@ class Extractor {
    * component).
    */
   async init (configs, parentConfig, nestingLevel, parentStep) {
+    const container = parentConfig.component
+
     if (!nestingLevel) {
       nestingLevel = 0
     }
 
     for (let i = 0; i < configs.length; i++) {
+      let newComponent = null
       const config = { ...configs[i] }
       const destination = config.as.split('.')
-      let newComponent = null
 
       config.parent = { ...parentConfig }
-      config.component = config.parent.component
+      config.component = container
 
       if (parentStep) {
         config.parentStep = parentStep
@@ -368,7 +370,7 @@ class Extractor {
 
       // Debug.
       console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
-      console.log(`  container : ${config.component.getName()} <- ${config.component.getAncestorsChain()}`)
+      console.log(`  container : ${container.getName()} <- ${container.getAncestorsChain()}`)
 
       // TODO (evol) since we have a setting to customize the container types,
       // we should alo have a way to specify the corresponding "destination".
@@ -398,7 +400,7 @@ class Extractor {
 
           newComponent = await this.iterableFactory({
             type: 'component',
-            container: config.component,
+            container,
             config
           })
           config.component.add(newComponent)
@@ -424,7 +426,7 @@ class Extractor {
 
           // All sub-extraction configs are "working" on the same instance (the
           // group of fields or properties).
-          subExtractionConfig.component = newComponent || config.component
+          subExtractionConfig.component = newComponent || container
 
           const step = await this.iterableFactory({
             type: 'step',
