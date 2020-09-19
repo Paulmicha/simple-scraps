@@ -135,12 +135,18 @@ class Iterable {
    *
    * Examples of jQuery-like syntax :
    *   1. Set a custom class on parent element and use it as new scope :
-   *     "selector": ".nav-tabs.parent()"
+   *     "selector": "$.makeArray($('.nav-tabs')).map(e => e.parentElement)"
+   *       TODO parse alternative simplified syntax ? e.g. :
+   *         "selector": ".nav-tabs.parents()"
    *   2. Idem, but using closest() to set scope in any ancestor (stops at
    *     closest match) :
-   *     "selector": ".nav-tabs.closest(section)"
+   *     "selector": "$.makeArray($('.nav-tabs')).map(e => $(e).closest(section)[0])"
+   *       TODO parse alternative simplified syntax ? e.g. :
+   *         "selector": ".nav-tabs.closests(section)"
    *   3. Going up then down the DOM tree :
-   *     "selector": ".nav-tabs.closest(section).find(.something)"
+   *     "selector": "$.makeArray($('.nav-tabs')).map(e => $(e).closest(section).find(.something)[0])"
+   *       TODO parse alternative simplified syntax ? e.g. :
+   *         "selector": ".nav-tabs.closests(section).descendants(.something)"
    *
    * @param {string} selector (optional) Allows overriding this method's result.
    */
@@ -154,18 +160,10 @@ class Iterable {
     // TODO support another key for vanilla JS, e.g. :
     // "evaluate": "Array.from(document.querySelectorAll('.nav-tabs')).map(e => e.parentElement)"
     if (this.selector.includes('$')) {
-      // Debug.
-      console.log(`the selector contains '$' : ${this.selector}`)
-
       if (!this.extractor.main.getSetting('addDomQueryHelper')) {
         this.locate('Error:')
         throw Error("The selector uses a syntax requiring the setting 'addDomQueryHelper', which is not enabled.")
       }
-
-      // const itemsHandle = await dom.evaluate(
-      //   this.extractor.pageWorker.page,
-      //   this.selector
-      // )
 
       this.extractor.markedElementsCount++
       const markerClass = `js-scraps-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
@@ -180,11 +178,12 @@ class Iterable {
         markerClass
       )
 
-      const markup = await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
-
       // Debug.
-      console.log('markup :')
-      console.log(markup)
+      // const markup = await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
+      // console.log('markup :')
+      // console.log(markup)
+
+      this.setSelector(`.${markerClass}`)
     }
 
     if (selector) {

@@ -357,30 +357,56 @@ class Extractor {
     for (let i = 0; i < configs.length; i++) {
       const config = { ...configs[i] }
       const destination = config.as.split('.')
-      config.parent = parentConfig
+      let newComponent = null
+
+      config.parent = { ...parentConfig }
+      config.component = config.parent.component
 
       if (parentStep) {
         config.parentStep = parentStep
       }
 
       // Debug.
-      // console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
+      console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
+      console.log(`  container : ${config.component.getName()} <- ${config.component.getAncestorsChain()}`)
 
       // TODO (evol) since we have a setting to customize the container types,
       // we should alo have a way to specify the corresponding "destination".
       // e.g. reuse 'extractionContainerTypes' and allow it to contain either an
       // array of trings (like now) or (todo) an array of mapping objects ?
+      // if (destination[0] === 'component') {
+      //   config.component = await this.iterableFactory({
+      //     type: 'component',
+      //     container: parentConfig.component,
+      //     config
+      //   })
+      //   parentConfig.component.add(config.component)
+      // } else {
+      //   // Otherwise, it's a field or property belonging to the parent Container
+      //   // component (could be the page document root Container).
+      //   config.component = parentConfig.component
+      // }
+
       if (destination[0] === 'component') {
-        config.component = await this.iterableFactory({
-          type: 'component',
-          container: parentConfig.component,
-          config
-        })
-        parentConfig.component.add(config.component)
-      } else {
-        // Otherwise, it's a field or property belonging to the parent Container
-        // component (could be the page document root Container).
-        config.component = parentConfig.component
+        // Debug.
+        console.log(`  Create component ? dest. = '${config.as}', name = ${config.component.getName()}`)
+
+        // if (container.getName() !== destination[1]) {
+        if (destination.length === 2 || config.component.getName() !== destination[1]) {
+          // Debug.
+          console.log('  -> Creating a new component.')
+
+          newComponent = await this.iterableFactory({
+            type: 'component',
+            container: config.component,
+            config
+          })
+          config.component.add(newComponent)
+
+          // if (destination.length === 2 && Array.isArray(config.extract)) {
+          //   config.component = newComponent
+          // }
+        }
       }
 
       // If this extraction config has multiple sub-extraction configs, it will
@@ -398,7 +424,7 @@ class Extractor {
 
           // All sub-extraction configs are "working" on the same instance (the
           // group of fields or properties).
-          subExtractionConfig.component = config.component
+          subExtractionConfig.component = newComponent || config.component
 
           const step = await this.iterableFactory({
             type: 'step',
@@ -475,9 +501,6 @@ class Extractor {
       selector: ':root'
     })
 
-    // TODO (wip) implement "reducer" of extraction steps for every non-existing
-    // scopes in the page.
-
     // Debug.
     console.log(`run() ${this.steps.count()} selectors, ${this.extracted.count()} components.`)
     // console.log(`  this.selectorExists = ${JSON.stringify(this.selectorExists, null, 2)}`)
@@ -486,7 +509,7 @@ class Extractor {
     // console.log('Before sorting :')
     // this.iterator.traverse(step => step.locate())
 
-    // 2. TODO (wip) Sort the extraction steps to start from deepest levels ?
+    // 2. Sort the extraction steps to start from deepest levels.
     this.iterator.sort()
 
     // Debug.
