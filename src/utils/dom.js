@@ -99,13 +99,70 @@ const markup = async (page, selector, minify) => {
 }
 
 /**
+ * Extracts DOM elements matching given selector and return the result of
+ * given callback.
+ *
+ * This runs Array.from(document.querySelectorAll(selector)) within the page and
+ * passes it as the first argument to callback.
+ * See https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pageevalselector-pagefunction-args
+ *
+ * @returns the return value of callback.
+ *
+ * @example
+ *   const divCount = await dom.select(pageWorker.page, 'div', divs => divs.length)
+ */
+const select = async (page, selector, callback, ...args) => {
+  /* istanbul ignore next */
+  return await page.$$eval(selector, callback, ...args)
+}
+
+/**
+ * Same as select(), but only returns the first match.
+ */
+const selectFirst = async (page, selector, callback, ...args) => {
+  /* istanbul ignore next */
+  return await page.$eval(selector, callback, ...args)
+}
+
+/**
+ * Evaluates given callback in the page context.
+ *
+ * If the callback returns a Promise, then this would wait for the promise to
+ * resolve and return its value.
+ *
+ * @returns the return value of callback.
+ *
+ * @example
+ *   // Passing arguments to pageFunction:
+ *   const result = await page.evaluate(x => {
+ *     return Promise.resolve(8 * x);
+ *   }, 7);
+ *   console.log(result); // prints "56"
+ *
+ * @example
+ *   // A string can also be passed in instead of a function:
+ *   console.log(await dom.evaluate(pageWorker.page, '1 + 2')); // prints "3"
+ *   const x = 10;
+ *   console.log(await dom.evaluate(pageWorker.page, `1 + ${x}`)); // prints "11"
+ *
+ * @example
+ *   // ElementHandle instances can be passed as arguments to the page.evaluate:
+ *   const bodyHandle = await dom.selectFirst(pageWorker.page, 'body');
+ *   const html = await dom.evaluate(pageWorker.page, body => body.innerHTML, bodyHandle);
+ *   await bodyHandle.dispose();
+ */
+const evaluate = async (page, evaluated, ...args) => {
+  /* istanbul ignore next */
+  return await page.$$eval(evaluated, ...args)
+}
+
+/**
  * Extracts an attribute from elements matching given selector.
  *
  * Always returns an array.
  */
 const attribute = async (page, selector, attribute) => {
-  /* istanbul ignore next */
-  return await page.$$eval(selector, items => items.map(
+  return await select(page, selector, items => items.map(
     item => item[attribute]
   ), attribute)
 }
@@ -114,14 +171,27 @@ const attribute = async (page, selector, attribute) => {
  * Extracts DOM elements matching given selector and return the result of
  * given callback.
  *
- * See https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pageevalselector-pagefunction-args
- *
  * If multiple elements match the selector, an Array will be returned, otherwise
  * a string.
  */
-const element = async (page, selector, callback) => {
-  /* istanbul ignore next */
-  return arrayOrItemIfSingle(await page.$$eval(selector, callback))
+const element = async (page, selector, callback, ...args) => {
+  return arrayOrItemIfSingle(
+    await select(page, selector, callback, ...args)
+  )
+}
+
+/**
+ * Adds given CSS class to matching elements.
+ *
+ * Returns an array of items affected.
+ */
+const addClass = async (page, selector, CSSClass) => {
+  return await select(
+    page,
+    selector,
+    items => items.map(item => item.classList.add(CSSClass)),
+    CSSClass
+  )
 }
 
 /**
@@ -144,5 +214,8 @@ module.exports = {
   textSingle,
   markup,
   attribute,
-  element
+  element,
+  select,
+  evaluate,
+  addClass
 }

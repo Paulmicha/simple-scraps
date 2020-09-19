@@ -1,3 +1,5 @@
+const dom = require('./utils/dom')
+
 /**
  * Base class of all Collection items (traversable and sortable via Iterator).
  *
@@ -49,7 +51,7 @@ class Iterable {
 
     if (this.ancestors && this.ancestors.length) {
       this.ancestorsChain = this.ancestors
-        .map(e => e.as)
+        .map(e => e.getName())
         .join(' <- ')
     }
 
@@ -142,14 +144,22 @@ class Iterable {
    *
    * @param {string} selector (optional) Allows overriding this method's result.
    */
-  scopeSelector (selector) {
-    // TODO (wip) Detect + convert jQuery-like syntax to normal CSS selectors
-    // (by injecting custom classes in page DOM elements ?)
-    // if (this.extractor.main.getSetting('addDomQueryHelper')) {
-    // }
-
+  async scopeSelector (selector) {
     if (selector) {
       this.setSelector(selector)
+    }
+
+    // Detect + convert jQuery-like syntax to normal CSS selectors by adding
+    // custom classes on matched elements.
+    if (this.selector.includes('$')) {
+      if (!this.extractor.main.getSetting('addDomQueryHelper')) {
+        this.locate('Error:')
+        throw Error("The selector uses a syntax requiring the setting 'addDomQueryHelper', which is not enabled.")
+      }
+      const matches = await dom.querySelectorAll()
+    }
+
+    if (selector) {
       return
     }
 

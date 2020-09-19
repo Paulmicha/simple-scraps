@@ -28,6 +28,12 @@ class Extractor {
     this.pageWorker = pageWorker
     this.main = main
 
+    // We'll need to check wether selectors match anything at all in the page,
+    // and if they have already been extracted in case elements get matched
+    // multiple times from higher depth levels.
+    this.selectorExists = {}
+    this.selectorAlreadyExtracted = {}
+
     // Set all defined extraction config that match current destination, unless
     // directly specified in the op (for cases where a single URL is "hardcoded"
     // in the entry point).
@@ -95,10 +101,12 @@ class Extractor {
     // root entity.
     // Also define the corresponding extraction config representation.
     this.rootExtractionConfig = { selector: ':root', extract: '*', as: 'rootComponent' }
-    this.rootComponent = this.iterableFactory({
-      type: 'rootComponent',
-      config: this.rootExtractionConfig
-    })
+    if (this.isRecursive) {
+      this.rootComponent = new Container(this, this.rootExtractionConfig)
+    } else {
+      this.rootComponent = new Leaf(this, this.rootExtractionConfig)
+    }
+    this.extracted.add(this.rootComponent)
   }
 
   /**
@@ -208,7 +216,7 @@ class Extractor {
   /**
    * Binds Iterable composite instances creation and scoping during init().
    */
-  iterableFactory (spec) {
+  async iterableFactory (spec) {
     const { type, config, container } = spec
     let instance
 
@@ -219,7 +227,7 @@ class Extractor {
     }
 
     switch (type) {
-      case 'step':
+      case 'step': {
         instance = new Step(this, config)
 
         // Set parent / ancestors scope.
@@ -235,10 +243,23 @@ class Extractor {
         // console.log(`iterableFactory(${type})`)
         // instance.locate('  ')
 
-        this.steps.add(instance)
+        // If nothing matches scoped selector, do not add it to the collection.
+        const fieldSelector = instance.getSelector()
+        this.selectorExists[fieldSelector] = await dom.exists(
+          this.pageWorker.page,
+          fieldSelector,
+          this.main.getSetting('selectorExistsTimeout')
+        )
+        if (this.selectorExists[fieldSelector]) {
+          this.steps.add(instance)
+        } else {
+          // Debug.
+          console.log(`No match for fieldSelector : '${fieldSelector}'`)
+        }
         break
+      }
 
-      case 'component':
+      case 'component': {
         if (container) {
           config.component = container
         }
@@ -262,23 +283,21 @@ class Extractor {
         // console.log(`iterableFactory(${type}) : ${instance.getName()}`)
         // instance.locate('  ')
 
-        this.extracted.add(instance)
-        break
-
-      // The root component is like the <html> tag (it's the single shared
-      /// component or first ancestor of all extracted fields or components).
-      case 'rootComponent':
-        if (this.isRecursive) {
-          instance = new Container(this, config)
+        // If nothing matches scoped selector, do not add it to the collection.
+        const componentSelector = instance.getSelector()
+        this.selectorExists[componentSelector] = await dom.exists(
+          this.pageWorker.page,
+          componentSelector,
+          this.main.getSetting('selectorExistsTimeout')
+        )
+        if (this.selectorExists[componentSelector]) {
+          this.extracted.add(instance)
         } else {
-          instance = new Leaf(this, config)
+          // Debug.
+          console.log(`No match for componentSelector : '${componentSelector}'`)
         }
-
-        // Debug.
-        // console.log(`iterableFactory(${type})`)
-
-        this.extracted.add(instance)
         break
+      }
     }
 
     return instance
@@ -345,7 +364,7 @@ class Extractor {
       // e.g. reuse 'extractionContainerTypes' and allow it to contain either an
       // array of trings (like now) or (todo) an array of mapping objects ?
       if (destination[0] === 'component') {
-        config.component = this.iterableFactory({
+        config.component = await this.iterableFactory({
           type: 'component',
           container: parentConfig.component,
           config
@@ -374,7 +393,7 @@ class Extractor {
           // group of fields or properties).
           subExtractionConfig.component = config.component
 
-          const step = this.iterableFactory({
+          const step = await this.iterableFactory({
             type: 'step',
             config: subExtractionConfig
           })
@@ -388,7 +407,7 @@ class Extractor {
         // Otherwise, we're dealing with a single field or property.
         // It could be belonging to the page document root, or to a component
         // that has a single field setup for extraction.
-        const step = this.iterableFactory({
+        const step = await this.iterableFactory({
           type: 'step',
           config
         })
@@ -426,16 +445,10 @@ class Extractor {
    *   // element(s) corresponding to the selector.
    */
   async nestExtractionConfig (config, nestingLevel, step) {
+    if (step && !this.selectorExists[step.getSelector()]) {
+      return
+    }
     if (this.main.getSetting('extractionContainerTypes').includes(config.extract)) {
-      // Check if step selector matches at least 1 element in the page.
-      const scopeExists = await dom.exists(
-        this.pageWorker.page,
-        step.getSelector(),
-        this.main.getSetting('selectorExistsTimeout')
-      )
-      if (!scopeExists) {
-        return
-      }
       nestingLevel++
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
         await this.init(this.nestedExtractionConfigs, config, nestingLevel, step)
@@ -460,6 +473,7 @@ class Extractor {
 
     // Debug.
     console.log(`run() ${this.steps.count()} selectors, ${this.extracted.count()} components.`)
+    // console.log(`  this.selectorExists = ${JSON.stringify(this.selectorExists, null, 2)}`)
 
     // Debug.
     // console.log('Before sorting :')
@@ -524,7 +538,7 @@ class Extractor {
     // Debug.
     // console.log(`${debugIndent || ''}step() ${field} for ${step.as}`)
     // console.log(`${debugIndent || ''}  ${step.selector}`)
-    console.log(step.locate('process() :'))
+    // console.log(step.locate('process() :'))
 
     // Support fields containing multiple items with props.
     if (Array.isArray(step.extract)) {

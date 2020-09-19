@@ -22,7 +22,7 @@
       "as": "component.Lede.text"
     },
     {
-      "selector": "header + section > .bs-component",
+      "selector": "$(.nav-tabs).parent()",
       "extract": [
         {
           "selector": "> .nav-tabs > li > .nav-link",
