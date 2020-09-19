@@ -1,4 +1,4 @@
-const dom = require('./utils/dom')
+const dom = require('../utils/dom')
 
 /**
  * Base class of all Collection items (traversable and sortable via Iterator).
@@ -151,12 +151,40 @@ class Iterable {
 
     // Detect + convert jQuery-like syntax to normal CSS selectors by adding
     // custom classes on matched elements.
+    // TODO support another key for vanilla JS, e.g. :
+    // "evaluate": "Array.from(document.querySelectorAll('.nav-tabs')).map(e => e.parentElement)"
     if (this.selector.includes('$')) {
+      // Debug.
+      console.log(`the selector contains '$' : ${this.selector}`)
+
       if (!this.extractor.main.getSetting('addDomQueryHelper')) {
         this.locate('Error:')
         throw Error("The selector uses a syntax requiring the setting 'addDomQueryHelper', which is not enabled.")
       }
-      const matches = await dom.querySelectorAll()
+
+      // const itemsHandle = await dom.evaluate(
+      //   this.extractor.pageWorker.page,
+      //   this.selector
+      // )
+
+      this.extractor.markedElementsCount++
+      const markerClass = `js-scraps-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
+
+      await dom.evaluate(
+        this.extractor.pageWorker.page,
+        (strToEval, markerClass) => {
+          const items = eval(strToEval)
+          items.map(e => e.classList.add(markerClass))
+        },
+        this.selector,
+        markerClass
+      )
+
+      const markup = await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
+
+      // Debug.
+      console.log('markup :')
+      console.log(markup)
     }
 
     if (selector) {

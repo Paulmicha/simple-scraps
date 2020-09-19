@@ -7,6 +7,7 @@
     "@sindresorhus/slugify": "^1.1.0",
     "cash-dom": "^8.0.0",
     "debug": "^4.1.1",
+    "hashids": "^2.2.1",
     "html-minifier-terser": "^5.1.1",
     "js-beautify": "^1.13.0",
     "mkdirp": "^1.0.4",

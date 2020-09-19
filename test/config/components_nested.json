@@ -22,7 +22,7 @@
       "as": "component.Lede.text"
     },
     {
-      "selector": "$(.nav-tabs).parent()",
+      "selector": "$.makeArray($('.nav-tabs')).map(e => e.parentElement)",
       "extract": [
         {
           "selector": "> .nav-tabs > li > .nav-link",

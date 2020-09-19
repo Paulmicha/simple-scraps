@@ -1,3 +1,4 @@
+const Hashids = require('hashids')
 const dom = require('./utils/dom')
 const Collection = require('./composite/Collection')
 const Step = require('./composite/Step')
@@ -33,6 +34,12 @@ class Extractor {
     // multiple times from higher depth levels.
     this.selectorExists = {}
     this.selectorAlreadyExtracted = {}
+
+    // In order to support selectors using jQuery-like syntax, we need a unique
+    // counter for hash IDs to track custom classes added to the page elements
+    // that need to be "marked".
+    this.markedElementsCount = 0
+    this.hashids = new Hashids('SimpleScraps', 16)
 
     // Set all defined extraction config that match current destination, unless
     // directly specified in the op (for cases where a single URL is "hardcoded"
@@ -237,7 +244,7 @@ class Extractor {
 
         // Scope the selector.
         instance.setAncestors()
-        instance.scopeSelector()
+        await instance.scopeSelector()
 
         // Debug.
         // console.log(`iterableFactory(${type})`)
@@ -277,7 +284,7 @@ class Extractor {
 
         // Scope the selector.
         instance.setAncestors()
-        instance.scopeSelector()
+        await instance.scopeSelector()
 
         // Debug.
         // console.log(`iterableFactory(${type}) : ${instance.getName()}`)

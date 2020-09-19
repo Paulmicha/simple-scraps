@@ -127,6 +127,8 @@ const selectFirst = async (page, selector, callback, ...args) => {
 /**
  * Evaluates given callback in the page context.
  *
+ * See https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pageevaluatepagefunction-args
+ *
  * If the callback returns a Promise, then this would wait for the promise to
  * resolve and return its value.
  *
@@ -134,7 +136,7 @@ const selectFirst = async (page, selector, callback, ...args) => {
  *
  * @example
  *   // Passing arguments to pageFunction:
- *   const result = await page.evaluate(x => {
+ *   const result = await dom.evaluate(pageWorker.page, x => {
  *     return Promise.resolve(8 * x);
  *   }, 7);
  *   console.log(result); // prints "56"
@@ -153,7 +155,7 @@ const selectFirst = async (page, selector, callback, ...args) => {
  */
 const evaluate = async (page, evaluated, ...args) => {
   /* istanbul ignore next */
-  return await page.$$eval(evaluated, ...args)
+  return await page.evaluate(evaluated, ...args)
 }
 
 /**
@@ -216,6 +218,7 @@ module.exports = {
   attribute,
   element,
   select,
+  selectFirst,
   evaluate,
   addClass
 }
