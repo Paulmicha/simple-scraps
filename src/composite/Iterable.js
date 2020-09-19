@@ -168,6 +168,7 @@ class Iterable {
       this.extractor.markedElementsCount++
       const markerClass = `js-scraps-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
 
+      /* istanbul ignore next */
       await dom.evaluate(
         this.extractor.pageWorker.page,
         (strToEval, markerClass) => {

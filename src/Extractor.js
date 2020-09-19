@@ -234,17 +234,28 @@ class Extractor {
       throw Error('Missing config in iterableFactory()')
     }
 
+    // The 'container' key allows to override the container component.
+    if (container) {
+      config.component = container
+    }
+
+    if (!config.component) {
+      throw Error('Missing container in iterableFactory()')
+    }
+
+    // Ne need to instanciate anything if we're inside a scope which doesn't
+    // match any element in the page.
+    const scopeExists = await config.component.selectorExists()
+    if (!scopeExists) {
+      return
+    }
+
     switch (type) {
       case 'step': {
         instance = new Step(this, config)
 
         // Set parent / ancestors scope.
-        if (config.component) {
-          if (!config.component.selectorExists()) {
-            return instance
-          }
-          instance.setParentComponent(config.component)
-        }
+        instance.setParentComponent(config.component)
 
         // Scope the selector.
         instance.setAncestors()
@@ -262,10 +273,6 @@ class Extractor {
       }
 
       case 'component': {
-        if (container) {
-          config.component = container
-        }
-
         if (this.isContainer(config)) {
           instance = new Container(this, config)
         } else {
@@ -273,9 +280,7 @@ class Extractor {
         }
 
         // Set parent / ancestors scope.
-        if (config.component) {
-          instance.setParentComponent(config.component)
-        }
+        instance.setParentComponent(config.component)
 
         // Scope the selector.
         instance.setAncestors()
