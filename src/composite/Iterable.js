@@ -218,6 +218,23 @@ class Iterable {
     return this.selector
   }
 
+  async selectorExists () {
+    const selector = this.getSelector()
+
+    // Memoization.
+    if (Object.keys(this.extractor.selectorExists).includes(selector)) {
+      return this.extractor.selectorExists[selector]
+    }
+
+    this.extractor.selectorExists[selector] = await dom.exists(
+      this.extractor.pageWorker.page,
+      selector,
+      this.extractor.main.getSetting('selectorExistsTimeout')
+    )
+
+    return this.extractor.selectorExists[selector]
+  }
+
   /**
    * Debug utility : logs in console clues to situate this collection item.
    */

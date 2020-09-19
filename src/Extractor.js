@@ -222,15 +222,16 @@ class Extractor {
 
   /**
    * Binds Iterable composite instances creation and scoping during init().
+   *
+   * 'Component' instances ('Leaf' and 'Container') are always created *before*
+   * 'Step' instances.
    */
   async iterableFactory (spec) {
     const { type, config, container } = spec
     let instance
 
-    // Debug.
     if (!config) {
-      console.log('Warning : no config passed in iterableFactory() - spec :')
-      console.log(spec)
+      throw Error('Missing config in iterableFactory()')
     }
 
     switch (type) {
@@ -239,6 +240,9 @@ class Extractor {
 
         // Set parent / ancestors scope.
         if (config.component) {
+          if (!config.component.selectorExists()) {
+            return instance
+          }
           instance.setParentComponent(config.component)
         }
 
@@ -251,17 +255,8 @@ class Extractor {
         // instance.locate('  ')
 
         // If nothing matches scoped selector, do not add it to the collection.
-        const fieldSelector = instance.getSelector()
-        this.selectorExists[fieldSelector] = await dom.exists(
-          this.pageWorker.page,
-          fieldSelector,
-          this.main.getSetting('selectorExistsTimeout')
-        )
-        if (this.selectorExists[fieldSelector]) {
+        if (await instance.selectorExists()) {
           this.steps.add(instance)
-        } else {
-          // Debug.
-          console.log(`No match for fieldSelector : '${fieldSelector}'`)
         }
         break
       }
@@ -291,17 +286,8 @@ class Extractor {
         // instance.locate('  ')
 
         // If nothing matches scoped selector, do not add it to the collection.
-        const componentSelector = instance.getSelector()
-        this.selectorExists[componentSelector] = await dom.exists(
-          this.pageWorker.page,
-          componentSelector,
-          this.main.getSetting('selectorExistsTimeout')
-        )
-        if (this.selectorExists[componentSelector]) {
+        if (await instance.selectorExists()) {
           this.extracted.add(instance)
-        } else {
-          // Debug.
-          console.log(`No match for componentSelector : '${componentSelector}'`)
         }
         break
       }
@@ -369,46 +355,21 @@ class Extractor {
       }
 
       // Debug.
-      console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
-      console.log(`  container : ${container.getName()} <- ${container.getAncestorsChain()}`)
+      // console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
+      // console.log(`  container : ${container.getName()} <- ${container.getAncestorsChain()}`)
 
       // TODO (evol) since we have a setting to customize the container types,
       // we should alo have a way to specify the corresponding "destination".
       // e.g. reuse 'extractionContainerTypes' and allow it to contain either an
       // array of trings (like now) or (todo) an array of mapping objects ?
-      // if (destination[0] === 'component') {
-      //   config.component = await this.iterableFactory({
-      //     type: 'component',
-      //     container: parentConfig.component,
-      //     config
-      //   })
-      //   parentConfig.component.add(config.component)
-      // } else {
-      //   // Otherwise, it's a field or property belonging to the parent Container
-      //   // component (could be the page document root Container).
-      //   config.component = parentConfig.component
-      // }
-
-      if (destination[0] === 'component') {
-        // Debug.
-        console.log(`  Create component ? dest. = '${config.as}', name = ${config.component.getName()}`)
-
-        // if (container.getName() !== destination[1]) {
-        if (destination.length === 2 || config.component.getName() !== destination[1]) {
-          // Debug.
-          console.log('  -> Creating a new component.')
-
-          newComponent = await this.iterableFactory({
-            type: 'component',
-            container,
-            config
-          })
-          config.component.add(newComponent)
-
-          // if (destination.length === 2 && Array.isArray(config.extract)) {
-          //   config.component = newComponent
-          // }
-        }
+      if (destination[0] === 'component' &&
+        (destination.length === 2 || config.component.getName() !== destination[1])) {
+        newComponent = await this.iterableFactory({
+          type: 'component',
+          container,
+          config
+        })
+        container.add(newComponent)
       }
 
       // If this extraction config has multiple sub-extraction configs, it will
