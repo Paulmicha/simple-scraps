@@ -13,7 +13,6 @@ const Iterable = require('./Iterable')
 class Step extends Iterable {
   constructor (extractor, config) {
     super(extractor, config)
-    // this.component = config.component
     this.emit = config.emit
   }
 

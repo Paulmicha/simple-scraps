@@ -230,20 +230,21 @@ class Extractor {
    * 'Step' instances.
    */
   async iterableFactory (spec) {
-    const { type, config, container } = spec
+    const { type, config, newComponent } = spec
     let instance
 
     if (!config) {
       throw Error('Missing config in iterableFactory()')
     }
 
-    // The 'container' key allows to override the container component.
-    if (container) {
-      config.component = container
+    // The 'newComponent' key allows to override the component which is going to
+    // receive the extracted values specified by given config.
+    if (newComponent) {
+      config.component = newComponent
     }
 
     if (!config.component) {
-      throw Error('Missing container in iterableFactory()')
+      throw Error('Missing component in iterableFactory()')
     }
 
     // Ne need to instanciate anything if we're inside a scope which doesn't
@@ -389,6 +390,11 @@ class Extractor {
         // console.log('  -> component :')
         // console.log(config.component.locate('    '))
 
+        // TODO : still a case to deal with : when array is like
+        //   - as: component.NavTabs.items[].title
+        //   - as: component.NavTabs.items[].content
+        // expected result is not multi-value 'title' fields on component, but
+        // multiple 'items' objects with 2 "sub-fields" each.
         for (let j = 0; j < config.extract.length; j++) {
           const subExtractionConfig = config.extract[j]
           subExtractionConfig.parent = config
@@ -413,7 +419,8 @@ class Extractor {
         // that has a single field setup for extraction.
         const step = await this.iterableFactory({
           type: 'step',
-          config
+          config,
+          newComponent
         })
 
         // A single field can still contain nested components.
