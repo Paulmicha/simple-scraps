@@ -13,7 +13,6 @@ const minifyHtml = require('html-minifier-terser').minify
 const exists = async (page, selector, timeout) => {
   let result = false
 
-  /* istanbul ignore next */
   await page.waitForSelector(selector, { timeout })
     .then(() => { result = true })
     .catch(() => { result = false })
@@ -191,7 +190,7 @@ const addClass = async (page, selector, CSSClass) => {
   return await select(
     page,
     selector,
-    items => items.map(item => item.classList.add(CSSClass)),
+    (items, CSSClass) => items.map(item => item.classList.add(CSSClass)),
     CSSClass
   )
 }

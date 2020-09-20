@@ -39,7 +39,10 @@ class Extractor {
     // counter for hash IDs to track custom classes added to the page elements
     // that need to be "marked".
     this.markedElementsCount = 0
-    this.hashids = new Hashids('SimpleScraps', 16)
+    this.hashids = new Hashids('SimpleScraps', 10)
+
+    // This class is used to avoid
+    this.alreadyExtractedClass = 'is-already-extracted-' + this.hashids.encode(1)
 
     // Set all defined extraction config that match current destination, unless
     // directly specified in the op (for cases where a single URL is "hardcoded"
@@ -532,15 +535,25 @@ class Extractor {
   async process (step) {
     let values = null
     const component = step.getComponent()
-    const selector = step.getSelector()
     const field = step.getField()
+
+    // In order to avoid risking extracting the same values more than once (e.g.
+    // nested components selected with descendant selectors), we must append
+    // the exclusion class to all selectors.
+    const selector = step.getSelector() + `:not(${this.alreadyExtractedClass})`
 
     // Debug.
     // console.log(`process() ${field} for ${step.as}`)
     // console.log(`  ${selector}`)
     // console.log(`  extracting ${step.extract}`)
-    console.log(`process(${step.extract})`)
-    step.locate()
+    console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
+    // step.locate()
+
+    // Debug.
+    const selectorExists = step.selectorExists()
+    if (!selectorExists) {
+      console.log(`  !! selector ${selector} does not match anything`)
+    }
 
     switch (step.extract) {
       case 'text':
@@ -565,13 +578,19 @@ class Extractor {
           this.main.getSetting('minifyExtractedHtml')
         )
         break
-      case 'attribute':
+      case 'attribute': {
+        const attribute = step.getConf('attribute')
+        if (!attribute) {
+          step.locate('Error:')
+          throw Error(`Missing attribute for extracting ${step.as}.`)
+        }
         values = await dom.attribute(
           this.pageWorker.page,
           selector,
-          step.getConf('attribute')
+          attribute
         )
         break
+      }
       case 'element': {
         const event = step.getConf('emit')
         if (!event) {
@@ -623,6 +642,11 @@ class Extractor {
         return { c: child.getName(), props: child.extracted }
       })
     }
+
+    // Mark matched selector as extracted to avoid risking extracting the same
+    // values more than once (e.g. nested components selected with descendant
+    // selectors).
+    await dom.addClass(this.pageWorker.page, selector, this.alreadyExtractedClass)
 
     // Finally, set as component field value.
     component.setField(field, values)

@@ -203,7 +203,7 @@ class Iterable {
 
     if (parentComponent && parentComponent.selector) {
       if (parentComponent.selector.length && parentComponent.selector !== ':root') {
-        this.selector = `${parentComponent.selector} ${this.selector}`
+        this.setSelector(`${parentComponent.getSelector()} ${this.getSelector()}`)
       }
     }
 
@@ -215,7 +215,7 @@ class Iterable {
     // This can break nested components lookups if we have someting like :
     // 'body > main' in the 1st depth level -> Apply only for 1st depth level.
     if (this.constructor.name !== 'Step' && this.parentStep && this.getDepth() === 1) {
-      this.selector = `${this.parentStep.getSelector()} ${this.selector}`
+      this.setSelector(`${this.parentStep.getSelector()} ${this.getSelector()}`)
     }
   }
 

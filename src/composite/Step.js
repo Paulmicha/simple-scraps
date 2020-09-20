@@ -22,7 +22,7 @@ class Step extends Iterable {
     const destination = this.as.split('.')
 
     if (destination.length > 2) {
-      field = destination[2]
+      field = destination[destination.length - 1]
     } else {
       field = destination[1]
     }
