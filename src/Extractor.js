@@ -529,24 +529,73 @@ class Extractor {
    * - <thing>.<type>.<prop> (ex: component.Lede.text)
    * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
    */
-  async process (step, debugIndent) {
+  async process (step) {
+    let values = null
     const component = step.getComponent()
+    const selector = step.getSelector()
     const field = step.getField()
 
     // Debug.
-    // console.log(`${debugIndent || ''}step() ${field} for ${step.as}`)
-    // console.log(`${debugIndent || ''}  ${step.selector}`)
-    // console.log(step.locate('process() :'))
+    // console.log(`process() ${field} for ${step.as}`)
+    // console.log(`  ${selector}`)
+    // console.log(`  extracting ${step.extract}`)
+    console.log(`process(${step.extract})`)
+    step.locate()
 
-    // Support fields containing multiple items with props.
-    if (Array.isArray(step.extract)) {
-      // await subItemsFieldProcess({ config, extracted, field })
-      console.log(`${debugIndent || ''}  TODO extract is an array : ${step.extract.map(e => e.as)}`)
-      return
+    switch (step.extract) {
+      case 'text':
+        values = await dom.text(
+          this.pageWorker.page,
+          selector,
+          this.main.getSetting('plainTextRemoveBreaks')
+        )
+        break
+      case 'text_single':
+        values = await dom.textSingle(
+          this.pageWorker.page,
+          selector,
+          this.main.getSetting('plainTextRemoveBreaks'),
+          this.main.getSetting('plainTextSeparator')
+        )
+        break
+      case 'markup':
+        values = await dom.markup(
+          this.pageWorker.page,
+          selector,
+          this.main.getSetting('minifyExtractedHtml')
+        )
+        break
+      case 'attribute':
+        values = await dom.attribute(
+          this.pageWorker.page,
+          selector,
+          step.getConf('attribute')
+        )
+        break
+      case 'element': {
+        const event = step.getConf('emit')
+        if (!event) {
+          step.locate('Error:')
+          throw Error(`Missing event for extracting ${step.as}.`)
+        }
+        const context = {}
+        const hadListeners = this.main.emit(event, step, context)
+        if (!hadListeners) {
+          step.locate('Error:')
+          throw Error(`Event '${event}' requires at least 1 listener for extracting ${step.as}.`)
+        }
+        if ('values' in context) {
+          values = context.values
+        } else if (context.callback) {
+          if (context.args) {
+            values = await dom.element(this.pageWorker.page, selector, context.callback, ...context.args)
+          } else {
+            values = await dom.element(this.pageWorker.page, selector, context.callback)
+          }
+        }
+        break
+      }
     }
-
-    // Debug.
-    // console.log(`${debugIndent || ''}  extracting ${step.extract}`)
 
     // When the 'extract' value is a container type, the component has to be
     // an instance of a composite Container (with children).
@@ -556,6 +605,7 @@ class Extractor {
       }
 
       const children = component.getChildren()
+        .filter(child => JSON.stringify(child.extracted) !== '{}')
 
       // Nothing to set when there are no children.
       if (!children.length) {
@@ -563,279 +613,20 @@ class Extractor {
       }
 
       // Debug.
-      console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
-      children.forEach(child => {
-        child.locate('    child :')
-        console.log(`    child.extracted = ${JSON.stringify(child.extracted)}`)
-      })
+      // console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
+      // children.forEach(child => {
+      //   child.locate('    child :')
+      //   console.log(`    child.extracted = ${JSON.stringify(child.extracted)}`)
+      // })
 
-      component.setField(field, children.map(child => {
+      values = children.map(child => {
         return { c: child.getName(), props: child.extracted }
-      }))
-    }
-
-    // "Normal" process : config.extract is a string.
-    switch (step.extract) {
-      case 'text': {
-        // const value = await dom.text(
-        component.setField(field, await dom.text(
-          this.pageWorker.page,
-          step.selector,
-          this.main.getSetting('plainTextRemoveBreaks')
-        ))
-        // )
-
-        // debug.
-        // console.log('value for field ' + field)
-        // console.log(value)
-
-        // component.setField(field, value)
-
-        break
-      }
-      case 'text_single':
-        component.setField(field, await dom.textSingle(
-          this.pageWorker.page,
-          step.selector,
-          this.main.getSetting('plainTextRemoveBreaks'),
-          this.main.getSetting('plainTextSeparator')
-        ))
-        break
-      case 'markup':
-        component.setField(field, await dom.markup(
-          this.pageWorker.page,
-          step.selector,
-          this.main.getSetting('minifyExtractedHtml')
-        ))
-        break
-
-      // TODO (wip) refactor in progress.
-      // TODO implement an extraction for attribute(s).
-      case 'element':
-        await elementFieldProcess({ step, component, field })
-        break
-    }
-  }
-}
-
-/**
- * Sub-processes fields containing multiple items with props.
- *
- * Outputs a single object from multiple extractors 'as' for example :
- * - component.MediaGrid.items[].image
- * - component.MediaGrid.items[].title
- * - component.MediaGrid.items[].text
- *
- * For now, there is NO support for deeper levels - e.g. :
- * - component.MediaGrid.items[].nested[].value
- * In these situations, nested child components are expected instead - e.g. :
- *   {
- *     "selector": "header + section > .bs-component",
- *     "extract": [
- *       {
- *         "selector": "> .nav-tabs > li > .nav-link",
- *         "extract": "text",
- *         "as": "component.NavTabs.items[].title"
- *       },
- *       {
- *         "selector": "> .tab-content > .tab-pane",
- *         "extract": "components",
- *         "as": "component.MediaGrid.items[].content"
- *       }
- *     ],
- *     "as": "component.NavTabs"
- *   }
- *
- * When the destination contains the string '[]', it means that we need to
- * create an array of objects. Each object can have 1 or many fields (or props).
- * Ex : component.MediaGrid.items[].title
- *  -> the component has an "items" property to be extracted as an array of
- *  objects, whose "title" is processed by a single sub-config run separately.
- *
- * When a field has a single match, its value is a string and is considered to
- * belong to the 1st item. Hence, we need to delimit the scope of a single item
- * otherwise if all fields do not have the same number of matches, we couldn't
- * determine to which item the extracted values belong.
- * -> Solution :
- * The 'delimiter' config is a CSS selector that sets the scope of every
- * single child item. Any element matched outside of this selector does not
- * belong to the same item.
- */
-const subItemsFieldProcess = async (o) => {
-  const { config, extracted, field } = o
-
-  // Debug.
-  // console.log(`subItemsFieldProcess(${field})`)
-  // console.log(config.extract)
-
-  const subItem = {}
-  // const subItemDelimiters = []
-
-  while (config.extract.length) {
-    const componentExtractor = config.extract.shift()
-    // componentExtractor.selector = `${config.selector} ${componentExtractor.selector}`
-
-    const multiFieldItemProp = componentExtractor.as.split('.').pop()
-
-    // Delimiters use "markers" that are directly set on the DOM element defined
-    // as scope for every single child item. They are data-attributes containing
-    // a counter.
-    // const destination = componentExtractor.as.split('.')
-
-    // TODO (wip) this will be implemented when we write tests.
-    // const destArrCursors = []
-    // destination.forEach((fragment, i) => {
-    //   if (fragment.indexOf('[]') !== false) {
-    //     destArrCursors.push(i)
-    //   }
-    // })
-
-    // Debug.
-    // subItemDelimiters.push(destination.join('.'))
-    console.log(`    subItemsFieldProcess() ${multiFieldItemProp} for ${componentExtractor.as}`)
-    // console.log(`      ${componentExtractor.selector}`)
-
-    await this.process({
-      config: componentExtractor,
-      parentExtractor: config,
-      extracted: subItem,
-      fieldOverride: multiFieldItemProp,
-      debugIndent: '      '
-    })
-  }
-
-  // Nothing to do when nothing matched.
-  if (JSON.stringify(subItem) === '{}') {
-    return
-  }
-
-  // Debug.
-  // console.log(`  TODO (wip) implement delimiters for ${subItemDelimiters.join(', ')}`)
-
-  // Debug.
-  console.log('  subItem :')
-  console.log(subItem)
-
-  // At this point, the subItem object has the following structure :
-  //  { <field_1>: 'value 1', <field_2>: ['value 2.1', 'value 2.2'] }
-  // What we need is the following :
-  //  [
-  //    { <field_1>: 'value 1', <field_2>: 'value 2.1' },
-  //    { <field_2>: 'value 2.2' }
-  //  ]
-  const subItems = []
-  Object.keys(subItem).forEach(key => {
-    if (Array.isArray(subItem[key])) {
-      subItem[key].forEach((value, i) => {
-        if (!subItems[i]) {
-          subItems[i] = {}
-        }
-        subItems[i][key] = value
       })
-    } else {
-      if (!subItems[0]) {
-        subItems[0] = {}
-      }
-      subItems[0][key] = subItem[key]
     }
-  })
 
-  // Debug.
-  console.log('  subItems :')
-  console.log(subItems)
-
-  extracted[field] = subItems
-}
-
-/**
- * Sub-processes 'element' fields.
- *
- * For these, the extraction process needs to be provided via event handlers.
- *
- * Emits an event corresponding to the value of config.emit which gets
- * an object representing the extraction details, and which expects it to be
- * altered to add a callback function in its 'callback' prop.
- *
- * Example callback function :
- *  items => items.map(item => item.innerHTML)
- */
-const elementFieldProcess = async (o) => {
-  const { config, extracted, field } = o
-
-  if (!config.emit) {
-    throw Error('Missing config "emit" config for processing ' + config.as + ', selector : ' + config.selector)
+    // Finally, set as component field value.
+    component.setField(field, values)
   }
-
-  // Debug.
-  // console.log(`emitting event '${config.emit}'`)
-
-  // The event listeners may provide either :
-  //  - a callback function which will be used by puppeteer's page.$$eval() API
-  //  - the field value directly (takes precedence if set)
-  this.main.emit(config.emit, o)
-
-  if ('result' in o) {
-    extracted[field] = o.result
-    return
-  }
-
-  if (!o.callback) {
-    throw Error('Missing callback for processing ' + config.as + ', selector : ' + config.selector)
-  }
-  extracted[field] = await element(this.pageWorker.page, config.selector, o.callback)
-}
-
-/**
- * Sub-processes 'components' fields.
- *
- * Some component extractors have a single prop destination, e.g. :
- *  "as": "component.Lede.text"
- * In this case, the resulting object is completed in a single run.
- *
- * Other components may define multiple extractors to complete their object. In
- * this case, the "extract" key would contain an array (of extractors), and the
- * destination would be e.g. :
- *  "as": "component.MediaGrid"
- */
-const componentsFieldProcess = async (o) => {
-  const { extracted, field } = o
-
-  // Debug.
-  console.log(`componentsFieldProcess() : ${o.config.as}`)
-
-  const components = []
-  const contexts = component.getExtractionContexts(o)
-
-  for (let i = 0; i < contexts.length; i++) {
-    const c = {}
-    const context = contexts[i]
-    context.extracted = c
-
-    // Debug.
-    // console.log(`  Will run extraction context : ${context.config.as} (type:${context.type}, props:${context.props})`)
-
-    await run(context)
-
-    // Debug.
-    // console.log(`Look for ${o.config.as} / ${context.config.as} (depth : ${context.config.depth})`)
-    // console.log(`  parents : ${context.config.ancestorsChain}`)
-
-    // TODO why empty object has Object.keys(c).length of 1 ?
-    // if (Object.keys(c).length !== 0) {
-    if (JSON.stringify(c) !== '{}') {
-      // Debug.
-      // console.log(`  result : ${JSON.stringify(c)} (${Object.keys(c).length})`)
-
-      // components.push(component.transformObject(c, context.type, context.props))
-      components.push(c)
-
-      // } else {
-      //   // Debug.
-      //   console.log('  nothing matched.')
-    }
-  }
-
-  extracted[field] = components
 }
 
 module.exports = Extractor

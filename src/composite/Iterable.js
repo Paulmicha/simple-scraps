@@ -18,6 +18,14 @@ class Iterable {
     this.extract = config.extract
     this.as = config.as
     this.parentStep = config.parentStep
+
+    // After all, go ahead and store the whole extraction configuration for
+    // cases like attribute extraction, which require an additional value.
+    // This allows any arbitrary values to be retrieved from confg during the
+    // extraction process.
+    // @see getConf()
+    // @see Extractor.process()
+    this.config = config
   }
 
   /**
@@ -234,6 +242,15 @@ class Iterable {
     )
 
     return this.extractor.selectorExists[selector]
+  }
+
+  /**
+   * Retrieves any extraction configuration value (by key).
+   */
+  getConf (key) {
+    if (key in this.config) {
+      return this.config[key]
+    }
   }
 
   /**
