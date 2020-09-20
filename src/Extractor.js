@@ -390,11 +390,6 @@ class Extractor {
         // console.log('  -> component :')
         // console.log(config.component.locate('    '))
 
-        // TODO : still a case to deal with : when array is like
-        //   - as: component.NavTabs.items[].title
-        //   - as: component.NavTabs.items[].content
-        // expected result is not multi-value 'title' fields on component, but
-        // multiple 'items' objects with 2 "sub-fields" each.
         for (let j = 0; j < config.extract.length; j++) {
           const subExtractionConfig = config.extract[j]
           subExtractionConfig.parent = config
@@ -655,8 +650,17 @@ class Extractor {
     // selectors).
     await dom.addClass(this.pageWorker.page, selector, this.alreadyExtractedClass)
 
-    // Finally, set as component field value.
-    component.setField(field, values)
+    // Deal with multi-fields groups, e.g. :
+    //   - component.MediaGrid.items[].image
+    //   - component.MediaGrid.items[].title
+    //   - component.MediaGrid.items[].text
+    if (step.isMultiField()) {
+      step.setMultiFieldValues(field, values)
+      component.setField(step.getMultiFieldName(), step.getMultiFieldObject())
+    } else {
+      // Otherwise, set as "normal" component field value.
+      component.setField(field, values)
+    }
   }
 }
 
