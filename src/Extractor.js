@@ -122,6 +122,11 @@ class Extractor {
   /**
    * Returns extraction definitions from main config.
    *
+   * The field or prop is determined by the 'as' config key. Examples :
+   * - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
+   * - <thing>.<type>.<prop> (ex: component.Lede.text)
+   * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
+   *
    * @param {string} lookup (optional) : specifies which configuration to get.
    *   Defaults to return the extraction configurations matching this.entityType
    *   and this.bundle. Otherwise, any value passed in this argument simply
@@ -524,15 +529,7 @@ class Extractor {
   }
 
   /**
-   * Processes an exctraction "step".
-   *
-   * This is called recursively to allow nested components extraction.
-   *
-   * The field or prop the given config will process is determined by the 'as'
-   * config key. Examples :
-   * - <thing>.<prop> (ex: entity.title, component.MediaGrid, etc)
-   * - <thing>.<type>.<prop> (ex: component.Lede.text)
-   * - <thing>.<type>.<nested>[].<prop> (ex: component.MediaGrid.items[].image)
+   * Processes an extraction "step".
    */
   async process (step) {
     let values = null
@@ -656,7 +653,7 @@ class Extractor {
     //   - component.MediaGrid.items[].text
     if (step.isMultiField()) {
       step.setMultiFieldValues(field, values)
-      component.setField(step.getMultiFieldName(), step.getMultiFieldObject())
+      component.setField(step.getMultiFieldName(), step.getMultiFieldItems())
     } else {
       // Otherwise, set as "normal" component field value.
       component.setField(field, values)

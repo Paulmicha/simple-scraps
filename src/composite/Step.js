@@ -49,10 +49,10 @@ class Step extends Iterable {
   }
 
   /**
-   * Returns the object that will store the extracted values for given field of
-   * a multi-field group.
+   * Gets the field name for the group that will store the extracted value(s) of
+   * a single "sub-field".
    *
-   * This object will be the same for multiple destinations like :
+   * This field will be the same for multiple destinations like :
    * - component.MediaGrid.items[].image
    * - component.MediaGrid.items[].title
    * - component.MediaGrid.items[].text
@@ -64,20 +64,6 @@ class Step extends Iterable {
    * -> The same field (i.e. in the example above : 'title') may have to be
    * assigned to different destinations in the same component.
    */
-  getMultiFieldObject () {
-    if (!this.isMultiField()) {
-      return
-    }
-
-    const fieldGroup = this.getMultiFieldName()
-
-    if (!(fieldGroup in this.multiFieldGroups)) {
-      this.multiFieldGroups[fieldGroup] = {}
-    }
-
-    return this.multiFieldGroups[fieldGroup]
-  }
-
   getMultiFieldName () {
     const destination = this.getDestination()
 
@@ -97,9 +83,40 @@ class Step extends Iterable {
     return name
   }
 
-  setMultiFieldValues (subField, values) {
-    const obj = this.getMultiFieldObject()
-    obj[subField] = values
+  setMultiFieldValues (subField, values, index) {
+    let i = 0
+    const fieldGroup = this.getMultiFieldName()
+
+    if (!(fieldGroup in this.multiFieldGroups)) {
+      this.multiFieldGroups[fieldGroup] = []
+    }
+
+    if (index !== null) {
+      if (!this.multiFieldGroups[fieldGroup][index]) {
+        this.multiFieldGroups[fieldGroup][index] = {}
+      }
+      this.multiFieldGroups[fieldGroup][index][subField] = values
+      return
+    }
+
+    if (Array.isArray(values)) {
+      for (i = 0; i < values.length; i++) {
+        if (!this.multiFieldGroups[fieldGroup][i]) {
+          this.multiFieldGroups[fieldGroup][i] = {}
+        }
+        this.multiFieldGroups[fieldGroup][i][subField] = values[i]
+      }
+    } else {
+      i = 0
+      if (!this.multiFieldGroups[fieldGroup][i]) {
+        this.multiFieldGroups[fieldGroup][i] = {}
+      }
+      this.multiFieldGroups[fieldGroup][i][subField] = values
+    }
+  }
+
+  getMultiFieldItems () {
+    return this.multiFieldGroups[this.getMultiFieldName()]
   }
 }
 
