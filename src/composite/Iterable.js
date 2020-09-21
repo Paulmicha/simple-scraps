@@ -28,7 +28,8 @@ class Iterable {
     this.config = config
 
     // Backup original selector value for the 'fallback' feature.
-    this.originalSelector = this.selector
+    // TODO (wip)
+    // this.originalSelector = this.selector
   }
 
   /**

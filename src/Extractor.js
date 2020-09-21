@@ -258,12 +258,13 @@ class Extractor {
     if (!scopeExists) {
       // Debug.
       // console.log(`    iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
-      console.log(`iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
-      console.log(`  -> fallback ? '${config.fallback}'`)
+      // console.log(`iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
+      // console.log(`  -> fallback ? '${config.fallback}'`)
 
-      if (!('fallback' in config)) {
-        return
-      }
+      // TODO (wip)
+      // if (!('fallback' in config)) {
+      //   return
+      // }
     }
 
     switch (type) {
@@ -558,7 +559,7 @@ class Extractor {
       }
 
       // Debug.
-      console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
+      // console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
 
       const children = component.getChildren()
         .filter(child => JSON.stringify(child.extracted) !== '{}')
@@ -566,18 +567,18 @@ class Extractor {
       // Nothing to set when there are no children.
       if (!children.length) {
         // Debug.
-        console.log(`  No children for component ${component.getName()}`)
-        console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
+        // console.log(`  No children for component ${component.getName()}`)
+        // console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
 
         return
       }
 
       // Debug.
-      // console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
-      // children.forEach(child => {
-      //   child.locate('    child :')
-      //   console.log(`    child.extracted = ${JSON.stringify(child.extracted)}`)
-      // })
+      console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
+      children.forEach(child => {
+        // child.locate('    child :')
+        console.log(`    child.extracted = ${JSON.stringify(child.extracted)}`)
+      })
 
       values = children.map(child => {
         return { c: child.getName(), props: child.extracted }
@@ -606,13 +607,15 @@ class Extractor {
 
   async extract (step, selector, fallback) {
     let values = null
-    let method = step.extract
 
-    if (fallback) {
-      method = fallback
-    }
+    // TODO (wip)
+    // let method = step.extract
+    // if (fallback) {
+    //   method = fallback
+    // }
+    // switch (method) {
 
-    switch (method) {
+    switch (step.extract) {
       case 'text':
         values = await dom.text(
           this.pageWorker.page,
@@ -675,16 +678,17 @@ class Extractor {
 
     // Provide opportunities to look for other elements in case no values were
     // found.
-    if (!values || !values.length) {
-      const f = step.getConf('fallback')
-      if (Array.isArray(f)) {
-        while (f.length && (!values || !values.length)) {
-          values = this.extract(step, selector, f.shift())
-        }
-      } else {
-        values = this.extract(step, selector, f)
-      }
-    }
+    // TODO (wip)
+    // if (!values || !values.length) {
+    //   const f = step.getConf('fallback')
+    //   if (Array.isArray(f)) {
+    //     while (f.length && (!values || !values.length)) {
+    //       values = this.extract(step, selector, f.shift())
+    //     }
+    //   } else {
+    //     values = this.extract(step, selector, f)
+    //   }
+    // }
 
     return values
   }
