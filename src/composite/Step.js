@@ -41,6 +41,10 @@ class Step extends Iterable {
     return this.getParentComponent()
   }
 
+  fieldIsNestedContainer () {
+    return this.extractor.main.getSetting('extractionContainerTypes').includes(this.extract)
+  }
+
   isMultiField () {
     const destination = this.getDestination()
     return destination.length > 1 &&

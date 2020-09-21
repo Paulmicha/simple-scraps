@@ -37,7 +37,7 @@ class Component extends Iterable {
     const subField = step.getField()
 
     // Debug.
-    console.log(`setMultiFieldValues() : ${fieldGroup}[].${subField} (${values.length} values)`)
+    // console.log(`setMultiFieldValues() : ${fieldGroup}[].${subField} (${values.length} values)`)
 
     if (!(fieldGroup in this.multiFieldGroups)) {
       this.multiFieldGroups[fieldGroup] = []
@@ -47,27 +47,37 @@ class Component extends Iterable {
       if (!this.multiFieldGroups[fieldGroup][index]) {
         this.multiFieldGroups[fieldGroup][index] = {}
       }
-      this.multiFieldGroups[fieldGroup][index][subField] = values
-      return
-    }
-
-    if (Array.isArray(values)) {
-      for (i = 0; i < values.length; i++) {
+      this.multiFieldValuesSetter(step, fieldGroup, index, subField, values)
+    } else {
+      if (Array.isArray(values)) {
+        for (i = 0; i < values.length; i++) {
+          if (!this.multiFieldGroups[fieldGroup][i]) {
+            this.multiFieldGroups[fieldGroup][i] = {}
+          }
+          this.multiFieldValuesSetter(step, fieldGroup, i, subField, values[i])
+        }
+      } else {
+        i = 0
         if (!this.multiFieldGroups[fieldGroup][i]) {
           this.multiFieldGroups[fieldGroup][i] = {}
         }
-        this.multiFieldGroups[fieldGroup][i][subField] = values[i]
+        this.multiFieldValuesSetter(step, fieldGroup, i, subField, values)
       }
-    } else {
-      i = 0
-      if (!this.multiFieldGroups[fieldGroup][i]) {
-        this.multiFieldGroups[fieldGroup][i] = {}
-      }
-      this.multiFieldGroups[fieldGroup][i][subField] = values
     }
 
     // Debug.
     // console.log(`  -> multiFieldGroups : ${JSON.stringify(this.multiFieldGroups, null, 2)}`)
+  }
+
+  multiFieldValuesSetter (step, fieldGroup, i, subField, values) {
+    if (step.fieldIsNestedContainer()) {
+      if (!(subField in this.multiFieldGroups[fieldGroup][i])) {
+        this.multiFieldGroups[fieldGroup][i][subField] = []
+      }
+      this.multiFieldGroups[fieldGroup][i][subField].push(values)
+    } else {
+      this.multiFieldGroups[fieldGroup][i][subField] = values
+    }
   }
 
   getMultiFieldItems (step) {

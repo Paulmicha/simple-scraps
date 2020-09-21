@@ -617,7 +617,7 @@ class Extractor {
 
     // When the 'extract' value is a container type, the component has to be
     // an instance of a composite Container (with children).
-    if (this.main.getSetting('extractionContainerTypes').includes(step.extract)) {
+    if (step.fieldIsNestedContainer()) {
       if (component.constructor.name !== 'Container') {
         throw Error("Can't process a 'container' extraction type when the component is not a Container itself.")
       }
