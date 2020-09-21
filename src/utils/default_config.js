@@ -12,7 +12,7 @@ const setting = (key) => {
   // TODO device emulation (i.e. mobile) ?
   defaults.pageW = 1280
   defaults.pageH = 800
-  defaults.addDomQueryHelper = true
+  defaults.addDomQueryHelper = false
   defaults.maxParallelPages = 4
   defaults.crawlDelay = [500, 2500]
 

@@ -137,24 +137,23 @@ class Iterable {
   /**
    * Scope and customize lookup selectors.
    *
-   * Allows jQuery-like selector syntax if there is a DOM Query Helper available
-   * in browsed page(s).
+   * Allows javascript selection via the 'select' config key. This string will
+   * be evaluated in page context. It will support jQuery-like API if the
+   * setting 'addDomQueryHelper' allows it.
    * @see Page.addDomQueryHelper()
    *
-   * Examples of jQuery-like syntax :
-   *   1. Set a custom class on parent element and use it as new scope :
-   *     "selector": "$.makeArray($('.nav-tabs')).map(e => e.parentElement)"
-   *       TODO parse alternative simplified syntax ? e.g. :
-   *         "selector": ".nav-tabs.parents()"
+   * Examples of JS 'select' values :
+   *   1. Parent element(s) :
+   *     "select": "Array.from(document.querySelectorAll('.nav-tabs')).map(e => e.parentElement)"
+   *     Or :
+   *     "select": "[...document.querySelectorAll('.nav-tabs')].map(e => e.parentElement)"
+   *     jQuery-like equivalent (if addDomQueryHelper = true) :
+   *     "select": "$.makeArray($('.nav-tabs')).map(e => e.parentElement)"
    *   2. Idem, but using closest() to set scope in any ancestor (stops at
    *     closest match) :
-   *     "selector": "$.makeArray($('.nav-tabs')).map(e => $(e).closest(section)[0])"
-   *       TODO parse alternative simplified syntax ? e.g. :
-   *         "selector": ".nav-tabs.closests(section)"
+   *     "select": "[...document.querySelectorAll('.nav-tabs')].map(e => e.closest(section))"
    *   3. Going up then down the DOM tree :
-   *     "selector": "$.makeArray($('.nav-tabs')).map(e => $(e).closest(section).find(.something)[0])"
-   *       TODO parse alternative simplified syntax ? e.g. :
-   *         "selector": ".nav-tabs.closests(section).descendants(.something)"
+   *     "select": "[...document.querySelectorAll('.nav-tabs')].map(e => [...e.closest(section).querySelectorAll('.something, .something-else')]"
    *
    * @param {string} selector (optional) Allows overriding this method's result.
    */
@@ -163,16 +162,9 @@ class Iterable {
       this.setSelector(selector)
     }
 
-    // Detect + convert jQuery-like syntax to normal CSS selectors by adding
-    // custom classes on matched elements.
-    // TODO support another key for vanilla JS, e.g. :
-    // "evaluate": "Array.from(document.querySelectorAll('.nav-tabs')).map(e => e.parentElement)"
-    if (this.selector.includes('$')) {
-      if (!this.extractor.main.getSetting('addDomQueryHelper')) {
-        this.locate('Error:')
-        throw Error("The selector uses a syntax requiring the setting 'addDomQueryHelper', which is not enabled.")
-      }
-
+    // Convert javascript eval string into CSS selector by adding custom classes
+    // on matched elements.
+    if (this.getConf('select')) {
       this.extractor.markedElementsCount++
       const markerClass = `js-scraps-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
 
@@ -183,7 +175,7 @@ class Iterable {
           const items = eval(strToEval)
           items.map(e => e.classList.add(markerClass))
         },
-        this.selector,
+        this.getConf('select'),
         markerClass
       )
 
@@ -224,7 +216,7 @@ class Iterable {
   }
 
   getSelector () {
-    return this.selector
+    return this.selector || this.getConf('select')
   }
 
   async selectorExists () {

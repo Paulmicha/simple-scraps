@@ -22,7 +22,7 @@
       "as": "component.Lede.text"
     },
     {
-      "selector": "$.makeArray($('.nav-tabs')).map(e => e.parentElement)",
+      "select": "[...document.querySelectorAll('.nav-tabs')].map(e => e.parentElement)",
       "extract": [
         {
           "selector": "> .nav-tabs > li > .nav-link",
@@ -32,6 +32,7 @@
         {
           "selector": "> .tab-content > .tab-pane",
           "extract": "components",
+          "fallback": "markup",
           "as": "component.NavTabs.items[].content"
         }
       ],
