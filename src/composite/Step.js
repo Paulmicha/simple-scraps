@@ -14,7 +14,6 @@ class Step extends Iterable {
   constructor (extractor, config) {
     super(extractor, config)
     this.emit = config.emit
-    this.multiFieldGroups = {}
   }
 
   getDestination () {
@@ -81,42 +80,6 @@ class Step extends Iterable {
     }
 
     return name
-  }
-
-  setMultiFieldValues (subField, values, index) {
-    let i = 0
-    const fieldGroup = this.getMultiFieldName()
-
-    if (!(fieldGroup in this.multiFieldGroups)) {
-      this.multiFieldGroups[fieldGroup] = []
-    }
-
-    if (index !== null) {
-      if (!this.multiFieldGroups[fieldGroup][index]) {
-        this.multiFieldGroups[fieldGroup][index] = {}
-      }
-      this.multiFieldGroups[fieldGroup][index][subField] = values
-      return
-    }
-
-    if (Array.isArray(values)) {
-      for (i = 0; i < values.length; i++) {
-        if (!this.multiFieldGroups[fieldGroup][i]) {
-          this.multiFieldGroups[fieldGroup][i] = {}
-        }
-        this.multiFieldGroups[fieldGroup][i][subField] = values[i]
-      }
-    } else {
-      i = 0
-      if (!this.multiFieldGroups[fieldGroup][i]) {
-        this.multiFieldGroups[fieldGroup][i] = {}
-      }
-      this.multiFieldGroups[fieldGroup][i][subField] = values
-    }
-  }
-
-  getMultiFieldItems () {
-    return this.multiFieldGroups[this.getMultiFieldName()]
   }
 }
 

@@ -652,8 +652,8 @@ class Extractor {
     //   - component.MediaGrid.items[].title
     //   - component.MediaGrid.items[].text
     if (step.isMultiField()) {
-      step.setMultiFieldValues(field, values)
-      component.setField(step.getMultiFieldName(), step.getMultiFieldItems())
+      component.setMultiFieldValues(step, values)
+      component.setField(step.getMultiFieldName(), component.getMultiFieldItems(step))
     } else {
       // Otherwise, set as "normal" component field value.
       component.setField(field, values)
