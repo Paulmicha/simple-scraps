@@ -32,8 +32,11 @@
         {
           "selector": "> .tab-content > .tab-pane",
           "extract": "components",
-          "fallback": "markup",
-          "as": "component.NavTabs.items[].content"
+          "as": "component.NavTabs.items[].content",
+          "fallback": {
+            "extract": "markup",
+            "as": "component.NavTabs.items[].rich_text"
+          }
         }
       ],
       "as": "component.NavTabs"

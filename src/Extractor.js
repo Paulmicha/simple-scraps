@@ -256,7 +256,14 @@ class Extractor {
     // match any element in the page.
     const scopeExists = await config.component.selectorExists()
     if (!scopeExists) {
-      return
+      // Debug.
+      // console.log(`    iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
+      console.log(`iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
+      console.log(`  -> fallback ? '${config.fallback}'`)
+
+      if (!('fallback' in config)) {
+        return
+      }
     }
 
     switch (type) {
@@ -495,17 +502,6 @@ class Extractor {
     // this.iterator.traverse(step => step.locate())
 
     // 3. Execute the actual extraction using the pageWorker.
-    // TODO (wip) Run all (optional) custom processes before extraction ?
-    // This could be run instead of the normal process() call. See what makes
-    // most sense later.
-    // If the config has a 'preprocess' key, its value serves as the event
-    // emitted to allow custom implementations that would prepare elements (e.g.
-    // add custom classes) to facilitate the extraction process.
-    await this.iterator.traverseAsync(async step => {
-      if ('emit' in step) {
-        await this.main.emit(step.emit, step, this)
-      }
-    })
     await this.iterator.traverseAsync(async step => await this.process(step))
 
     // Debug.
@@ -545,16 +541,78 @@ class Extractor {
     // console.log(`process() ${field} for ${step.as}`)
     // console.log(`  ${selector}`)
     // console.log(`  extracting ${step.extract}`)
-    console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
+    // console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
     // step.locate()
 
     // Debug.
     const selectorExists = step.selectorExists()
     if (!selectorExists) {
-      console.log(`  !! selector ${selector} does not match anything`)
+      console.log(`  !! Selector "${selector}" fits the already extracted case`)
     }
 
-    switch (step.extract) {
+    // When the 'extract' value is a container type, the component has to be
+    // an instance of a composite Container (with children).
+    if (step.fieldIsNestedContainer()) {
+      if (component.constructor.name !== 'Container') {
+        throw Error("Can't process a 'container' extraction type when the component is not a Container itself.")
+      }
+
+      // Debug.
+      console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
+
+      const children = component.getChildren()
+        .filter(child => JSON.stringify(child.extracted) !== '{}')
+
+      // Nothing to set when there are no children.
+      if (!children.length) {
+        // Debug.
+        console.log(`  No children for component ${component.getName()}`)
+        console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
+
+        return
+      }
+
+      // Debug.
+      // console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
+      // children.forEach(child => {
+      //   child.locate('    child :')
+      //   console.log(`    child.extracted = ${JSON.stringify(child.extracted)}`)
+      // })
+
+      values = children.map(child => {
+        return { c: child.getName(), props: child.extracted }
+      })
+    } else {
+      values = await this.extract(step, selector)
+    }
+
+    // Mark matched selector as extracted to avoid risking extracting the same
+    // values more than once (e.g. nested components selected with descendant
+    // selectors).
+    await dom.addClass(this.pageWorker.page, selector, this.alreadyExtractedClass)
+
+    // Deal with multi-fields groups, e.g. :
+    //   - component.MediaGrid.items[].image
+    //   - component.MediaGrid.items[].title
+    //   - component.MediaGrid.items[].text
+    if (step.isMultiField()) {
+      component.setMultiFieldValues(step, values)
+      component.setField(step.getMultiFieldName(), component.getMultiFieldItems(step))
+    } else {
+      // Otherwise, set as "normal" component field value.
+      component.setField(field, values)
+    }
+  }
+
+  async extract (step, selector, fallback) {
+    let values = null
+    let method = step.extract
+
+    if (fallback) {
+      method = fallback
+    }
+
+    switch (method) {
       case 'text':
         values = await dom.text(
           this.pageWorker.page,
@@ -615,49 +673,20 @@ class Extractor {
       }
     }
 
-    // When the 'extract' value is a container type, the component has to be
-    // an instance of a composite Container (with children).
-    if (step.fieldIsNestedContainer()) {
-      if (component.constructor.name !== 'Container') {
-        throw Error("Can't process a 'container' extraction type when the component is not a Container itself.")
+    // Provide opportunities to look for other elements in case no values were
+    // found.
+    if (!values || !values.length) {
+      const f = step.getConf('fallback')
+      if (Array.isArray(f)) {
+        while (f.length && (!values || !values.length)) {
+          values = this.extract(step, selector, f.shift())
+        }
+      } else {
+        values = this.extract(step, selector, f)
       }
-
-      const children = component.getChildren()
-        .filter(child => JSON.stringify(child.extracted) !== '{}')
-
-      // Nothing to set when there are no children.
-      if (!children.length) {
-        return
-      }
-
-      // Debug.
-      // console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
-      // children.forEach(child => {
-      //   child.locate('    child :')
-      //   console.log(`    child.extracted = ${JSON.stringify(child.extracted)}`)
-      // })
-
-      values = children.map(child => {
-        return { c: child.getName(), props: child.extracted }
-      })
     }
 
-    // Mark matched selector as extracted to avoid risking extracting the same
-    // values more than once (e.g. nested components selected with descendant
-    // selectors).
-    await dom.addClass(this.pageWorker.page, selector, this.alreadyExtractedClass)
-
-    // Deal with multi-fields groups, e.g. :
-    //   - component.MediaGrid.items[].image
-    //   - component.MediaGrid.items[].title
-    //   - component.MediaGrid.items[].text
-    if (step.isMultiField()) {
-      component.setMultiFieldValues(step, values)
-      component.setField(step.getMultiFieldName(), component.getMultiFieldItems(step))
-    } else {
-      // Otherwise, set as "normal" component field value.
-      component.setField(field, values)
-    }
+    return values
   }
 }
 

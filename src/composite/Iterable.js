@@ -26,6 +26,9 @@ class Iterable {
     // @see getConf()
     // @see Extractor.process()
     this.config = config
+
+    // Backup original selector value for the 'fallback' feature.
+    this.originalSelector = this.selector
   }
 
   /**
