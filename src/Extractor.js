@@ -244,6 +244,10 @@ class Extractor {
 
     // The 'newComponent' key allows to override the component which is going to
     // receive the extracted values specified by given config.
+    // TODO (minor) choose better variable names to represent explicitly the
+    // difference between parent and current which only makes sense for Step
+    // instances ?
+    const parentComponent = config.component
     if (newComponent) {
       config.component = newComponent
     }
@@ -254,25 +258,25 @@ class Extractor {
 
     // Ne need to instanciate anything if we're inside a scope which doesn't
     // match any element in the page.
-    const scopeExists = await config.component.selectorExists()
-    if (!scopeExists) {
-      // Debug.
-      // console.log(`    iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
-      // console.log(`iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
-      // console.log(`  -> fallback ? '${config.fallback}'`)
+    // const scopeExists = await config.component.selectorExists()
+    // if (!scopeExists) {
+    //   // Debug.
+    //   // console.log(`    iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
+    //   console.log(`iterableFactory(${type}) : scope not found (${config.component.getSelector()})`)
+    //   // console.log(`  -> fallback ? '${config.fallback}'`)
 
-      // TODO (wip)
-      // if (!('fallback' in config)) {
-      //   return
-      // }
-    }
+    //   // TODO (wip)
+    //   // if (!('fallback' in config)) {
+    //   //   return
+    //   // }
+    // }
 
     switch (type) {
       case 'step': {
         instance = new Step(this, config)
 
         // Set parent / ancestors scope.
-        instance.setParentComponent(config.component)
+        instance.setParentComponent(parentComponent)
 
         // Scope the selector.
         instance.setAncestors()
@@ -286,6 +290,10 @@ class Extractor {
         if (await instance.selectorExists()) {
           this.steps.add(instance)
         }
+        // else {
+        //   // Debug.
+        //   console.log(`iterableFactory(${type}) : Step selector not found (${instance.getSelector()})`)
+        // }
         break
       }
 
@@ -311,6 +319,10 @@ class Extractor {
         if (await instance.selectorExists()) {
           this.extracted.add(instance)
         }
+        // else {
+        //   // Debug.
+        //   console.log(`iterableFactory(${type}) : Component selector not found (${instance.getSelector()})`)
+        // }
         break
       }
     }
@@ -385,7 +397,10 @@ class Extractor {
       // e.g. reuse 'extractionContainerTypes' and allow it to contain either an
       // array of trings (like now) or (todo) an array of mapping objects ?
       if (destination[0] === 'component' &&
-        (destination.length === 2 || config.component.getName() !== destination[1])) {
+        (destination.length === 2 || container.getName() !== destination[1])) {
+        // Debug.
+        // console.log(`    Create new component : '${config.as}'`)
+
         newComponent = await this.iterableFactory({
           type: 'component',
           container,
@@ -527,8 +542,16 @@ class Extractor {
 
   /**
    * Processes an extraction "step".
+   *
+   * This is idempotent : the same step will only get processed once, even if
+   * the method is called more than once for the same step.
    */
   async process (step) {
+    if (step.isProcessed()) {
+      return
+    }
+    step.processed = true
+
     let values = null
     const component = step.getComponent()
     const field = step.getField()
@@ -569,7 +592,6 @@ class Extractor {
         // Debug.
         // console.log(`  No children for component ${component.getName()}`)
         // console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
-
         return
       }
 
@@ -577,7 +599,8 @@ class Extractor {
       console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
       children.forEach(child => {
         // child.locate('    child :')
-        console.log(`    child.extracted = ${JSON.stringify(child.extracted)}`)
+        // console.log(`    ${child.getName()} = ${JSON.stringify(child.extracted)}`)
+        console.log(`    ${child.getName()} = ${child.extracted}`)
       })
 
       values = children.map(child => {

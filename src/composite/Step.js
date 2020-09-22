@@ -14,6 +14,8 @@ class Step extends Iterable {
   constructor (extractor, config) {
     super(extractor, config)
     this.emit = config.emit
+    this.processed = false
+    this.component = config.component
   }
 
   getDestination () {
@@ -38,7 +40,7 @@ class Step extends Iterable {
   }
 
   getComponent () {
-    return this.getParentComponent()
+    return this.component
   }
 
   fieldIsNestedContainer () {
@@ -84,6 +86,10 @@ class Step extends Iterable {
     }
 
     return name
+  }
+
+  isProcessed () {
+    return this.processed
   }
 }
 

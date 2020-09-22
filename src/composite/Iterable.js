@@ -97,6 +97,7 @@ class Iterable {
     // Debug.
     // console.log(`getAncestors() for ${this.constructor.name} '${this.extract}' as ${this.as}`)
     // console.log(ancestors.map(a => a.locate('')))
+    // console.log(`  ancestors = ${ancestors}`)
     // if (this.constructor.name !== 'Step') {
     //   console.log(`getAncestors() of ${this.getName()} (${this.constructor.name})`)
     //   if (!ancestors.length) {
