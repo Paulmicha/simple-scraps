@@ -289,11 +289,15 @@ class Extractor {
         // If nothing matches scoped selector, do not add it to the collection.
         if (await instance.selectorExists()) {
           this.steps.add(instance)
+        } else {
+          // Debug.
+          // console.log(`iterableFactory(${type}) : Step selector not found (${instance.getSelector()})`)
+
+          // IF a step didn't match anything, look for fallback.
+          if ('fallback' in config) {
+            await this.fallbackStep(config, parentComponent, newComponent)
+          }
         }
-        // else {
-        //   // Debug.
-        //   console.log(`iterableFactory(${type}) : Step selector not found (${instance.getSelector()})`)
-        // }
         break
       }
 
@@ -328,6 +332,22 @@ class Extractor {
     }
 
     return instance
+  }
+
+  async fallbackStep (config, parentComponent, newComponent) {
+    const fallbackConfig = config.fallback
+
+    fallbackConfig.component = parentComponent
+    delete config.fallback
+
+    // Debug.
+    console.log(`fallbackStep() for config ${fallbackConfig}`)
+
+    return await this.iterableFactory({
+      type: 'step',
+      config: { ...config, ...fallbackConfig },
+      newComponent
+    })
   }
 
   /**
@@ -389,7 +409,7 @@ class Extractor {
       }
 
       // Debug.
-      // console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
+      console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
       // console.log(`  container : ${container.getName()} <- ${container.getAncestorsChain()}`)
 
       // TODO (evol) since we have a setting to customize the container types,
@@ -403,8 +423,8 @@ class Extractor {
 
         newComponent = await this.iterableFactory({
           type: 'component',
-          container,
-          config
+          config,
+          newComponent
         })
         container.add(newComponent)
       }
@@ -428,7 +448,8 @@ class Extractor {
 
           const step = await this.iterableFactory({
             type: 'step',
-            config: subExtractionConfig
+            config: subExtractionConfig,
+            newComponent
           })
 
           // Any field or property of this group can contain nested components.
@@ -590,8 +611,8 @@ class Extractor {
       // Nothing to set when there are no children.
       if (!children.length) {
         // Debug.
-        // console.log(`  No children for component ${component.getName()}`)
-        // console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
+        console.log(`  No children for component ${component.getName()}`)
+        console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
         return
       }
 

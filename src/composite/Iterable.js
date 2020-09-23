@@ -185,7 +185,9 @@ class Iterable {
       )
 
       // Debug.
+      await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
       // const markup = await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
+      // console.log(`scopeSelector() : .${markerClass} replaces ${this.getSelector()}`)
       // console.log('markup :')
       // console.log(markup)
 
