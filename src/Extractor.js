@@ -409,7 +409,7 @@ class Extractor {
       }
 
       // Debug.
-      console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
+      // console.log(`init() lv.${nestingLevel} config ${i + 1}/${configs.length}`)
       // console.log(`  container : ${container.getName()} <- ${container.getAncestorsChain()}`)
 
       // TODO (evol) since we have a setting to customize the container types,
@@ -508,6 +508,11 @@ class Extractor {
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
         await this.init(this.nestedExtractionConfigs, config, nestingLevel, step)
       }
+
+      // Debug.
+      // const component = step.getComponent()
+      // console.log(`after nestExtractionConfig(,${nestingLevel},) of lv.${component.getDepth()} ${component.getName()}`)
+      // console.log(step.locate())
     }
   }
 
@@ -642,7 +647,22 @@ class Extractor {
     //   - component.MediaGrid.items[].text
     if (step.isMultiField()) {
       component.setMultiFieldValues(step, values)
-      component.setField(step.getMultiFieldName(), component.getMultiFieldItems(step))
+
+      const multiFieldItems = component.getMultiFieldItems(step)
+      component.setField(step.getMultiFieldName(), multiFieldItems)
+
+      if (multiFieldItems.length) {
+        const fallback = step.getConf('fallback')
+        multiFieldItems.forEach(item => {
+          // Debug.
+          // console.log(step.locate(`mf '${step.getMultiFieldName()}.${step.getField()}' fallback ?`))
+          console.log(`mf '${step.getMultiFieldName()}.${step.getField()}' (${step.extract} as ${step.as})`)
+          console.log([item, fallback])
+
+          // if (!(step.getField() in item) && fallback) {
+          // }
+        })
+      }
     } else {
       // Otherwise, set as "normal" component field value.
       component.setField(field, values)
