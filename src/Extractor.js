@@ -388,22 +388,35 @@ class Extractor {
   }
 
   /**
-   * Populates the composite collection based on extraction configs.
+   * Populates the composite collections based on extraction configs.
    *
    * We need to obtain instances of composite Component classes (Leaf and
-   * Container) to represent what will be extracted (in as many steps as there
-   * are selectors to run - i.e. one step per Component field or prop) :
+   * Container) to represent what will be extracted, in as many steps as there
+   * are selectors to run - i.e. one step per Component field or prop.
    *
-   *   1. Single fields or properties of the main entity being extracted
-   *     (because 1 Extractor works on 1 open page = 1 resulting object)
-   *   2. Groups of multiple fields or properties (e.g. a component)
-   *   3. Nested components as field or property value (either of the page being
-   *     extracted or of one of its components)
+   * We also need Step instances to represent all these individual extraction
+   * processes :
+   *
+   *   1. Single fields or properties of the "main" entity being extracted
+   *     (because the Extractor class works on 1 open page = 1 "main" object),
+   *   2. Groups of multiple fields or properties (e.g. a component),
+   *   3. Nested components as field or property value, either of the page being
+   *     extracted or of one of its components.
    *
    * If a config 'extract' key is not an array and has a destination ('as' key)
-   * corresponding to a component, we assume that the component is to be
-   * extracted as a single prop component (contained in the parent config
-   * component).
+   * corresponding to a component prop, when that component name differs from
+   * its container, we assume that component is to be extracted as a single prop
+   * component. Like in the following config, for instance - the first and only
+   * occurence of the 'Lede' component in ht ewhold config is directly
+   * 'component.Lede.text') :
+   *   "components": [
+   *     {
+   *       "selector": "header.jumbotron > .container *:not(h1)",
+   *       "extract": "text_single",
+   *       "as": "component.Lede.text"
+   *     },
+   *     ... (rest of components extraction configs)
+   *   ]
    */
   async init (configs, parentConfig, nestingLevel, parentStep) {
     const container = parentConfig.component
@@ -514,6 +527,9 @@ class Extractor {
    *   // When the 'selector' key is set, it constrains the components lookup
    *   // within its scope - i.e. it will only match descendants of the
    *   // element(s) corresponding to the selector.
+   *
+   * For a complete extraction config example,
+   * @see test/config/components_nested.json
    */
   async nestExtractionConfig (config, nestingLevel, step) {
     if (step && !this.selectorExists[step.getSelector()]) {
@@ -524,11 +540,6 @@ class Extractor {
       if (nestingLevel < this.main.getSetting('maxExtractionNestingDepth')) {
         await this.init(this.nestedExtractionConfigs, config, nestingLevel, step)
       }
-
-      // Debug.
-      // const component = step.getComponent()
-      // console.log(`after nestExtractionConfig(,${nestingLevel},) of lv.${component.getDepth()} ${component.getName()}`)
-      // console.log(step.locate())
     }
   }
 
@@ -613,18 +624,25 @@ class Extractor {
     // Debug.
     const selectorExists = step.selectorExists()
     if (!selectorExists) {
-      console.log(`  !! Selector "${selector}" fits the already extracted case`)
+      console.log(`TODO confirm : selector "${selector}" might be already extracted.`)
     }
 
-    // When the 'extract' value is a container type, the component has to be
-    // an instance of a composite Container (with children).
-    if (step.fieldIsNestedContainer()) {
+    // "Normal" extraction deals with field or prop values like plain text,
+    // markup, attributes, or customized elements extraction process using event
+    // (i.e. 'emit' config key).
+    if (!step.fieldIsNestedContainer()) {
+      values = await this.extract(step, selector)
+    } else {
+      // When the 'extract' value is a container type, the component has to be
+      // an instance of a composite Container (with children).
       if (component.constructor.name !== 'Container') {
         throw Error("Can't process a 'container' extraction type when the component is not a Container itself.")
       }
 
       // Debug.
       // console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
+      console.log(`process(${step.extract}) of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      console.log(`  children.length = ${component.getChildren().length}`)
 
       const children = component.getChildren()
       // .filter(child => JSON.stringify(child.extracted) !== '{}')
@@ -643,16 +661,15 @@ class Extractor {
       //   // child.locate('    child :')
       //   // console.log(`    ${child.getName()} = ${JSON.stringify(child.extracted)}`)
       // })
-      // for (let i = 0; i < children.length; i++) {
-      //   const child = children[i]
-      //   console.log(`    ${child.getName()} = ${JSON.stringify(child.extracted)}`)
-      // }
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i]
+        // console.log(`    child ${i} = ${child.getName()} = ${JSON.stringify(child.extracted)}`)
+        console.log(`    child ${i} = ${child.getName()} (keys : ${Object.keys(child.extracted)})`)
+      }
 
       values = children.map(child => {
         return { c: child.getName(), props: child.extracted }
       })
-    } else {
-      values = await this.extract(step, selector)
     }
 
     // Mark matched selector as extracted to avoid risking extracting the same
@@ -673,66 +690,27 @@ class Extractor {
     //   - component.MediaGrid.items[].text
     if (step.isMultiField()) {
       component.setMultiFieldValues(step, values)
-
-      const multiFieldItems = component.getMultiFieldItems(step)
-      const multiFieldName = step.getMultiFieldName()
-      component.setField(multiFieldName, multiFieldItems)
-
-      // Fallback feature for multi-field items : when a prop is missing, look
-      // for a fallback config and process it as new step.
-      /*
-      if (multiFieldItems.length) {
-        for (let i = 0; i < multiFieldItems.length; i++) {
-          const item = multiFieldItems[i]
-
-          if (!(step.getField() in item)) {
-            // Prevent infinite loop by ensuring we only attempt fallback once per
-            // item.
-            // const onceKey = step.as.replace(`${multiFieldName}[]`, `${multiFieldName}[${i}]`)
-
-            // Debug.
-            console.log(`${component.getName()} '${step.getMultiFieldName()}[${i}].${step.getField()}' (${step.extract}) :`)
-            console.log(`  item ${i} is missing prop '${step.getField()}'`)
-            // console.log(`  onceKey = ${onceKey}`)
-
-            // Prevent infinite loop by ensuring we only attempt fallback once per
-            // item.
-            // if (onceKey in component.fallbacksAlreadyTried) {
-            //   continue
-            // }
-            // component.fallbacksAlreadyTried[onceKey] = true
-
-            const fallbackStep = await this.createFallbackStep(step.config, component)
-            if (!fallbackStep) {
-              continue
-            }
-
-            // Debug.
-            // console.log(`mf '${step.getMultiFieldName()}.${step.getField()}' (${step.extract} as ${step.as})`)
-            // console.log(`    '${fallbackStep.getMultiFieldName()}.${fallbackStep.getField()}' (${fallbackStep.extract} as ${fallbackStep.as})`)
-            console.log(`    fallbackStep keys : ${Object.keys(fallbackStep)}`)
-
-            // fallbackStep.locate('fallbackStep :')
-            // await this.process(fallbackStep)
-          }
-        }
-      }
-      */
+      component.setField(
+        step.getMultiFieldName(),
+        component.getMultiFieldItems(step)
+      )
     } else {
       // Otherwise, set as "normal" component field value.
       component.setField(field, values)
     }
   }
 
-  async extract (step, selector, fallback) {
+  /**
+   * Returns extracted value(s) for a field or prop (represented by given Step
+   * instance).
+   *
+   * @param {Step} step instance representing the extraction details of a single
+   *   field or prop.
+   * @param {string} selector already scoped and/or transformed in
+   *   iterableFactory() and process().
+   */
+  async extract (step, selector) {
     let values = null
-
-    // TODO (wip)
-    // let method = step.extract
-    // if (fallback) {
-    //   method = fallback
-    // }
-    // switch (method) {
 
     switch (step.extract) {
       case 'text':
@@ -795,21 +773,91 @@ class Extractor {
       }
     }
 
+    // Debug.
+    const component = step.getComponent()
+    console.log(`Step of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+    console.log(`  values = ${values}`)
+
+    if (values && values.length) {
+      return values
+    }
+
     // Provide opportunities to look for other elements in case no values were
     // found.
-    // TODO (wip)
-    // if (!values || !values.length) {
-    //   const f = step.getConf('fallback')
-    //   if (Array.isArray(f)) {
-    //     while (f.length && (!values || !values.length)) {
-    //       values = this.extract(step, selector, f.shift())
-    //     }
-    //   } else {
-    //     values = this.extract(step, selector, f)
+
+    // const f = step.getConf('fallback')
+    // if (Array.isArray(f)) {
+    //   while (f.length && (!values || !values.length)) {
+    //     values = this.extract(step, selector, f.shift())
     //   }
+    // } else {
+    //   values = this.extract(step, selector, f)
     // }
 
-    return values
+    // const component = step.getComponent()
+
+    if (!step.isMultiField()) {
+      // Debug.
+      console.log(`TODO fallback for NON multiField step of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+    } else {
+      // Debug.
+      console.log(`Fallback for multiField step of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+
+      const multiFieldItems = component.getMultiFieldItems(step)
+      const multiFieldName = step.getMultiFieldName()
+
+      if (multiFieldItems.length) {
+        for (let i = 0; i < multiFieldItems.length; i++) {
+          const item = multiFieldItems[i]
+
+          if (!(step.getField() in item)) {
+            // Prevent infinite loop by ensuring we only attempt fallback once per
+            // item.
+            // const onceKey = step.as.replace(`${multiFieldName}[]`, `${multiFieldName}[${i}]`)
+
+            // Debug.
+            console.log(`${component.getName()} '${multiFieldName}[${i}].${step.getField()}' (${step.extract}) :`)
+            console.log(`  item ${i} is missing prop '${step.getField()}'`)
+            // console.log(`  onceKey = ${onceKey}`)
+
+            // Prevent infinite loop by ensuring we only attempt fallback once per
+            // item.
+            // if (onceKey in component.fallbacksAlreadyTried) {
+            //   continue
+            // }
+            // component.fallbacksAlreadyTried[onceKey] = true
+
+            const fallbackStep = await this.createFallbackStep(step.config, component)
+            if (!fallbackStep) {
+              continue
+            }
+
+            // Debug.
+            // console.log(`mf '${step.getMultiFieldName()}.${step.getField()}' (${step.extract} as ${step.as})`)
+            // console.log(`    '${fallbackStep.getMultiFieldName()}.${fallbackStep.getField()}' (${fallbackStep.extract} as ${fallbackStep.as})`)
+            console.log(`    fallbackStep keys : ${Object.keys(fallbackStep)}`)
+
+            // fallbackStep.locate('fallbackStep :')
+            // await this.process(fallbackStep)
+          }
+        }
+      }
+    }
+
+    // Fallback feature for multi-field items : when a prop is missing, look
+    // for a fallback config and process it as new step.
+    /*
+
+    if (step.isMultiField()) {
+      component.setMultiFieldValues(step, values)
+      const multiFieldItems = component.getMultiFieldItems(step)
+      const multiFieldName = step.getMultiFieldName()
+      component.setField(multiFieldName, multiFieldItems)
+    } else {
+      // Otherwise, set as "normal" component field value.
+      component.setField(field, values)
+    }
+    */
   }
 }
 
