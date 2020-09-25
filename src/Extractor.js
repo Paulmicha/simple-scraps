@@ -293,9 +293,11 @@ class Extractor {
           // Debug.
           // console.log(`iterableFactory(${type}) : Step selector not found (${instance.getSelector()})`)
 
-          // IF a step didn't match anything, look for fallback.
-          if ('fallback' in config) {
-            await this.fallbackStep(config, parentComponent, newComponent)
+          // Instead, look for a fallback : if it has a selector, it should
+          // be tried and if it matches anything, it should be added to the
+          // collection.
+          if ('fallback' in config && 'selector' in config.fallback) {
+            await this.createFallbackStep(config, parentComponent, newComponent)
           }
         }
         break
@@ -334,18 +336,32 @@ class Extractor {
     return instance
   }
 
-  async fallbackStep (config, parentComponent, newComponent) {
-    const fallbackConfig = config.fallback
+  /**
+   * Tries to create a new step when a selector didn't match anything in the
+   * page, or when process() detects a missing prop after extract().
+   *
+   * @param {Object} config of step with a selector that matched nothing.
+   * @param {Component} parentComponent of that step.
+   * @param {Component} newComponent (optional) if created in init().
+   */
+  async createFallbackStep (config, parentComponent, newComponent) {
+    if (!('fallback' in config)) {
+      return
+    }
 
-    fallbackConfig.component = parentComponent
-    delete config.fallback
+    const currentConfig = { ...config }
+    const fallbackConfig = currentConfig.fallback
 
     // Debug.
-    console.log(`fallbackStep() for config ${fallbackConfig}`)
+    // console.log(`createFallbackStep() - (${config.extract} as ${config.as})`)
+    // console.log(`fallbackConfig = ${JSON.stringify(fallbackConfig, null, 2)}`)
+
+    fallbackConfig.component = parentComponent
+    delete currentConfig.fallback
 
     return await this.iterableFactory({
       type: 'step',
-      config: { ...config, ...fallbackConfig },
+      config: { ...currentConfig, ...fallbackConfig },
       newComponent
     })
   }
@@ -611,7 +627,7 @@ class Extractor {
       // console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
 
       const children = component.getChildren()
-        .filter(child => JSON.stringify(child.extracted) !== '{}')
+      // .filter(child => JSON.stringify(child.extracted) !== '{}')
 
       // Nothing to set when there are no children.
       if (!children.length) {
@@ -622,12 +638,15 @@ class Extractor {
       }
 
       // Debug.
-      console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
-      children.forEach(child => {
-        // child.locate('    child :')
-        // console.log(`    ${child.getName()} = ${JSON.stringify(child.extracted)}`)
-        console.log(`    ${child.getName()} = ${child.extracted}`)
-      })
+      // console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
+      // children.forEach(child => {
+      //   // child.locate('    child :')
+      //   // console.log(`    ${child.getName()} = ${JSON.stringify(child.extracted)}`)
+      // })
+      // for (let i = 0; i < children.length; i++) {
+      //   const child = children[i]
+      //   console.log(`    ${child.getName()} = ${JSON.stringify(child.extracted)}`)
+      // }
 
       values = children.map(child => {
         return { c: child.getName(), props: child.extracted }
@@ -641,6 +660,13 @@ class Extractor {
     // selectors).
     await dom.addClass(this.pageWorker.page, selector, this.alreadyExtractedClass)
 
+    // Prevent infinite loop by ensuring we only attempt fallback once per
+    // field or prop, or multifield item field or prop.
+    // const fallback = step.getConf('fallback')
+    // if (fallback && !('fallbacksAlreadyTried' in component)) {
+    //   component.fallbacksAlreadyTried = {}
+    // }
+
     // Deal with multi-fields groups, e.g. :
     //   - component.MediaGrid.items[].image
     //   - component.MediaGrid.items[].title
@@ -649,20 +675,49 @@ class Extractor {
       component.setMultiFieldValues(step, values)
 
       const multiFieldItems = component.getMultiFieldItems(step)
-      component.setField(step.getMultiFieldName(), multiFieldItems)
+      const multiFieldName = step.getMultiFieldName()
+      component.setField(multiFieldName, multiFieldItems)
 
+      // Fallback feature for multi-field items : when a prop is missing, look
+      // for a fallback config and process it as new step.
+      /*
       if (multiFieldItems.length) {
-        const fallback = step.getConf('fallback')
-        multiFieldItems.forEach(item => {
-          // Debug.
-          // console.log(step.locate(`mf '${step.getMultiFieldName()}.${step.getField()}' fallback ?`))
-          console.log(`mf '${step.getMultiFieldName()}.${step.getField()}' (${step.extract} as ${step.as})`)
-          console.log([item, fallback])
+        for (let i = 0; i < multiFieldItems.length; i++) {
+          const item = multiFieldItems[i]
 
-          // if (!(step.getField() in item) && fallback) {
-          // }
-        })
+          if (!(step.getField() in item)) {
+            // Prevent infinite loop by ensuring we only attempt fallback once per
+            // item.
+            // const onceKey = step.as.replace(`${multiFieldName}[]`, `${multiFieldName}[${i}]`)
+
+            // Debug.
+            console.log(`${component.getName()} '${step.getMultiFieldName()}[${i}].${step.getField()}' (${step.extract}) :`)
+            console.log(`  item ${i} is missing prop '${step.getField()}'`)
+            // console.log(`  onceKey = ${onceKey}`)
+
+            // Prevent infinite loop by ensuring we only attempt fallback once per
+            // item.
+            // if (onceKey in component.fallbacksAlreadyTried) {
+            //   continue
+            // }
+            // component.fallbacksAlreadyTried[onceKey] = true
+
+            const fallbackStep = await this.createFallbackStep(step.config, component)
+            if (!fallbackStep) {
+              continue
+            }
+
+            // Debug.
+            // console.log(`mf '${step.getMultiFieldName()}.${step.getField()}' (${step.extract} as ${step.as})`)
+            // console.log(`    '${fallbackStep.getMultiFieldName()}.${fallbackStep.getField()}' (${fallbackStep.extract} as ${fallbackStep.as})`)
+            console.log(`    fallbackStep keys : ${Object.keys(fallbackStep)}`)
+
+            // fallbackStep.locate('fallbackStep :')
+            // await this.process(fallbackStep)
+          }
+        }
       }
+      */
     } else {
       // Otherwise, set as "normal" component field value.
       component.setField(field, values)
