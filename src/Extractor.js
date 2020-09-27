@@ -291,7 +291,8 @@ class Extractor {
           this.steps.add(instance)
         } else {
           // Debug.
-          // console.log(`iterableFactory(${type}) : Step selector not found (${instance.getSelector()})`)
+          // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} for ${instance.getComponent().getName()}.${instance.getField()}`)
+          // console.log(`   Step selector not found : ${instance.getSelector()}`)
 
           // Instead, look for a fallback : if it has a selector, it should
           // be tried and if it matches anything, it should be added to the
@@ -324,11 +325,18 @@ class Extractor {
         // If nothing matches scoped selector, do not add it to the collection.
         if (await instance.selectorExists()) {
           this.extracted.add(instance)
+        } else {
+          // Debug.
+          // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
+          // console.log(`   Component selector not found : ${instance.getSelector()}`)
+
+          // Instead, look for a fallback : if it has a selector, it should
+          // be tried and if it matches anything, it should be added to the
+          // collection.
+          if ('fallback' in config && 'selector' in config.fallback) {
+            await this.createFallbackStep(config, config.component)
+          }
         }
-        // else {
-        //   // Debug.
-        //   console.log(`iterableFactory(${type}) : Component selector not found (${instance.getSelector()})`)
-        // }
         break
       }
     }
@@ -353,7 +361,10 @@ class Extractor {
     const fallbackConfig = currentConfig.fallback
 
     // Debug.
-    // console.log(`createFallbackStep() - (${config.extract} as ${config.as})`)
+    // const component = newComponent || parentComponent
+    // console.log(`createFallbackStep() - ${config.extract} as ${config.as}`)
+    // console.log(`createFallbackStep() - lv.${component.getDepth()} for ${component.getName()}`)
+    // console.log(`  ${config.extract} as ${config.as}`)
     // console.log(`fallbackConfig = ${JSON.stringify(fallbackConfig, null, 2)}`)
 
     fallbackConfig.component = parentComponent
@@ -601,6 +612,10 @@ class Extractor {
    */
   async process (step) {
     if (step.isProcessed()) {
+      // Debug.
+      // console.log(`Skip process(${step.extract}) lv.${step.getDepth()} for ${step.getComponent().getName()}.${step.getField()}`)
+      // console.log('  -> step is already processed')
+
       return
     }
     step.processed = true
@@ -615,11 +630,11 @@ class Extractor {
     const selector = step.getSelector() + `:not(${this.alreadyExtractedClass})`
 
     // Debug.
-    // console.log(`process() ${field} for ${step.as}`)
-    // console.log(`  ${selector}`)
-    // console.log(`  extracting ${step.extract}`)
-    // console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
-    // step.locate()
+    if (component.getName() === 'Card') {
+      console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      console.log(`  ${selector}`)
+      // step.locate()
+    }
 
     // Debug.
     const selectorExists = step.selectorExists()
@@ -640,18 +655,22 @@ class Extractor {
       }
 
       // Debug.
-      // console.log(`process(${step.extract}) '${field}' of lv.${component.getDepth()} ${component.getName()}`)
-      console.log(`process(${step.extract}) of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
-      console.log(`  children.length = ${component.getChildren().length}`)
+      // console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      // console.log(`  children.length = ${component.getChildren().length}`)
 
       const children = component.getChildren()
-      // .filter(child => JSON.stringify(child.extracted) !== '{}')
+        .filter(child => JSON.stringify(child.extracted) !== '{}')
 
       // Nothing to set when there are no children.
       if (!children.length) {
         // Debug.
-        console.log(`  No children for component ${component.getName()}`)
-        console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
+        // console.log(`  No children for component ${component.getName()}`)
+        // console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
+
+        if (step.getConf('fallback')) {
+          await this.processFallback(step, selector)
+        }
+
         return
       }
 
@@ -697,6 +716,55 @@ class Extractor {
     } else {
       // Otherwise, set as "normal" component field value.
       component.setField(field, values)
+    }
+  }
+
+  /**
+   * Processes the fallback extraction config when process didn't produce any
+   * result.
+   *
+   * @param {Step} step Step instance
+   * @param {string} selector
+   */
+  async processFallback (step, selector) {
+    const component = step.getComponent()
+
+    if (!step.isMultiField()) {
+      const fallbackStep = await this.createFallbackStep(step.config, component)
+      if (!fallbackStep) {
+        return
+      }
+      await this.process(fallbackStep)
+    } else {
+      // Debug.
+      // console.log(`Fallback for multiField step of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+
+      const multiFieldItems = component.getMultiFieldItems(step)
+
+      if (multiFieldItems.length) {
+        for (let i = 0; i < multiFieldItems.length; i++) {
+          const item = multiFieldItems[i]
+
+          if (!(step.getField() in item)) {
+            // Debug.
+            console.log(`processFallback() - ${component.getName()} '${step.getMultiFieldName()}[${i}].${step.getField()}' (${step.extract}) :`)
+            console.log(`  item ${i} is missing prop '${step.getField()}'`)
+
+            const fallbackStep = await this.createFallbackStep(step.config, component)
+            if (!fallbackStep) {
+              continue
+            }
+
+            // Debug.
+            // console.log(`mf '${step.getMultiFieldName()}.${step.getField()}' (${step.extract} as ${step.as})`)
+            // console.log(`    '${fallbackStep.getMultiFieldName()}.${fallbackStep.getField()}' (${fallbackStep.extract} as ${fallbackStep.as})`)
+            // console.log(`    fallbackStep keys : ${Object.keys(fallbackStep)}`)
+            // fallbackStep.locate('fallbackStep :')
+
+            await this.process(fallbackStep)
+          }
+        }
+      }
     }
   }
 
@@ -775,8 +843,10 @@ class Extractor {
 
     // Debug.
     const component = step.getComponent()
-    console.log(`Step of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
-    console.log(`  values = ${values}`)
+    if (component.getName() === 'Card') {
+      console.log(`extract() lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      console.log(`  values = ${values}`)
+    }
 
     if (values && values.length) {
       return values
@@ -784,80 +854,7 @@ class Extractor {
 
     // Provide opportunities to look for other elements in case no values were
     // found.
-
-    // const f = step.getConf('fallback')
-    // if (Array.isArray(f)) {
-    //   while (f.length && (!values || !values.length)) {
-    //     values = this.extract(step, selector, f.shift())
-    //   }
-    // } else {
-    //   values = this.extract(step, selector, f)
-    // }
-
-    // const component = step.getComponent()
-
-    if (!step.isMultiField()) {
-      // Debug.
-      console.log(`TODO fallback for NON multiField step of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
-    } else {
-      // Debug.
-      console.log(`Fallback for multiField step of lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
-
-      const multiFieldItems = component.getMultiFieldItems(step)
-      const multiFieldName = step.getMultiFieldName()
-
-      if (multiFieldItems.length) {
-        for (let i = 0; i < multiFieldItems.length; i++) {
-          const item = multiFieldItems[i]
-
-          if (!(step.getField() in item)) {
-            // Prevent infinite loop by ensuring we only attempt fallback once per
-            // item.
-            // const onceKey = step.as.replace(`${multiFieldName}[]`, `${multiFieldName}[${i}]`)
-
-            // Debug.
-            console.log(`${component.getName()} '${multiFieldName}[${i}].${step.getField()}' (${step.extract}) :`)
-            console.log(`  item ${i} is missing prop '${step.getField()}'`)
-            // console.log(`  onceKey = ${onceKey}`)
-
-            // Prevent infinite loop by ensuring we only attempt fallback once per
-            // item.
-            // if (onceKey in component.fallbacksAlreadyTried) {
-            //   continue
-            // }
-            // component.fallbacksAlreadyTried[onceKey] = true
-
-            const fallbackStep = await this.createFallbackStep(step.config, component)
-            if (!fallbackStep) {
-              continue
-            }
-
-            // Debug.
-            // console.log(`mf '${step.getMultiFieldName()}.${step.getField()}' (${step.extract} as ${step.as})`)
-            // console.log(`    '${fallbackStep.getMultiFieldName()}.${fallbackStep.getField()}' (${fallbackStep.extract} as ${fallbackStep.as})`)
-            console.log(`    fallbackStep keys : ${Object.keys(fallbackStep)}`)
-
-            // fallbackStep.locate('fallbackStep :')
-            // await this.process(fallbackStep)
-          }
-        }
-      }
-    }
-
-    // Fallback feature for multi-field items : when a prop is missing, look
-    // for a fallback config and process it as new step.
-    /*
-
-    if (step.isMultiField()) {
-      component.setMultiFieldValues(step, values)
-      const multiFieldItems = component.getMultiFieldItems(step)
-      const multiFieldName = step.getMultiFieldName()
-      component.setField(multiFieldName, multiFieldItems)
-    } else {
-      // Otherwise, set as "normal" component field value.
-      component.setField(field, values)
-    }
-    */
+    await this.processFallback(step, selector)
   }
 }
 

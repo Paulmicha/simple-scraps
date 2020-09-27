@@ -42,7 +42,7 @@
       "as": "component.NavTabs"
     },
     {
-      "selector": ".card",
+      "select": "[...document.querySelectorAll('.card')].filter(e => e.parentElement.getAttribute('id') !== 'accordion').map(e => e.parentElement)",
       "extract": [
         {
           "selector": "> .card-header",
