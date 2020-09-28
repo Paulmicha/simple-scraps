@@ -55,7 +55,7 @@ class Step extends Iterable {
 
   /**
    * Gets the field name for the group that will store the extracted value(s) of
-   * a single "sub-field".
+   * all "sub-fields".
    *
    * This field will be the same for multiple destinations like :
    * - component.MediaGrid.items[].image
@@ -68,6 +68,13 @@ class Step extends Iterable {
    *
    * -> The same field (i.e. in the example above : 'title') may have to be
    * assigned to different destinations in the same component.
+   *
+   * @example
+   *   this.as = 'component.MediaGrid.items[].image'
+   *   const group = this.getMultiFieldName()
+   *   // group = 'items'
+   *   const subField = this.getField()
+   *   // subField = 'image'
    */
   getMultiFieldName () {
     const destination = this.getDestination()

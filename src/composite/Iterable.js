@@ -181,7 +181,7 @@ class Iterable {
       )
 
       // Debug.
-      await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
+      // await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
       // const markup = await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
       // console.log(`scopeSelector() : .${markerClass} replaces ${this.getSelector()}`)
       // console.log('markup :')
@@ -196,10 +196,11 @@ class Iterable {
 
     const parentComponent = this.getParentComponent()
 
-    if (parentComponent && parentComponent.selector) {
-      if (parentComponent.selector.length && parentComponent.selector !== ':root') {
-        this.setSelector(`${parentComponent.getSelector()} ${this.getSelector()}`)
-      }
+    if (parentComponent &&
+      parentComponent.selector &&
+      parentComponent.selector.length &&
+      parentComponent.selector !== ':root') {
+      this.setSelector(`${parentComponent.getSelector()} ${this.getSelector()}`)
     }
 
     // When config.parentStep is set, it means we are in a recursive call via a
@@ -222,8 +223,10 @@ class Iterable {
     return this.selector || this.getConf('select')
   }
 
-  async selectorExists () {
-    const selector = this.getSelector()
+  async selectorExists (selector) {
+    if (!selector) {
+      selector = this.getSelector()
+    }
 
     // Memoization.
     if (Object.keys(this.extractor.selectorExists).includes(selector)) {
@@ -267,8 +270,8 @@ class Iterable {
     if (this.constructor.name !== 'Step') {
       console.log(`${debugIndent}lv.${depth} ${this.getName()} (${this.constructor.name}) <- ${this.getAncestorsChain()}`)
     } else {
-      console.log(`${debugIndent}lv.${depth} Step : prop '${this.getField()}' (${stringifiedExtract})`)
-      this.getComponent().locate(debugIndent + 'of :')
+      console.log(`${debugIndent}lv.${depth} ${this.getComponent().getName()}.${this.getField()} (${stringifiedExtract}) ${this.getComponent().getAncestorsChain()}`)
+      // this.getComponent().locate(debugIndent + 'of :')
     }
 
     if (this.selector) {

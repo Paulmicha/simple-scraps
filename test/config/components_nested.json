@@ -42,7 +42,7 @@
       "as": "component.NavTabs"
     },
     {
-      "select": "[...document.querySelectorAll('.card')].filter(e => e.parentElement.getAttribute('id') !== 'accordion').map(e => e.parentElement)",
+      "select": "[...document.querySelectorAll('.card')].filter(e => e.parentElement.getAttribute('id') !== 'accordion')",
       "extract": [
         {
           "selector": "> .card-header",
@@ -61,6 +61,22 @@
         }
       ],
       "as": "component.Card"
+    },
+    {
+      "selector": ".blockquote",
+      "extract": [
+        {
+          "selector": "> *:not(.blockquote-footer)",
+          "extract": "text_single",
+          "as": "component.BlockQuote.quote"
+        },
+        {
+          "selector": "> .blockquote-footer",
+          "extract": "markup",
+          "as": "component.BlockQuote.source"
+        }
+      ],
+      "as": "component.BlockQuote"
     }
   ]
 }

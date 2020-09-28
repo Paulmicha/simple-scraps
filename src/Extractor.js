@@ -42,7 +42,7 @@ class Extractor {
     this.hashids = new Hashids('SimpleScraps', 10)
 
     // This class is used to avoid
-    this.alreadyExtractedClass = 'is-already-extracted-' + this.hashids.encode(1)
+    this.alreadyExtractedClass = 'already-extracted-' + this.hashids.encode(1)
 
     // Set all defined extraction config that match current destination, unless
     // directly specified in the op (for cases where a single URL is "hardcoded"
@@ -291,8 +291,8 @@ class Extractor {
           this.steps.add(instance)
         } else {
           // Debug.
-          // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} for ${instance.getComponent().getName()}.${instance.getField()}`)
-          // console.log(`   Step selector not found : ${instance.getSelector()}`)
+          console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} for ${instance.getComponent().getName()}.${instance.getField()}`)
+          console.log(`   Step selector not found : ${instance.getSelector()}`)
 
           // Instead, look for a fallback : if it has a selector, it should
           // be tried and if it matches anything, it should be added to the
@@ -613,8 +613,8 @@ class Extractor {
   async process (step) {
     if (step.isProcessed()) {
       // Debug.
-      // console.log(`Skip process(${step.extract}) lv.${step.getDepth()} for ${step.getComponent().getName()}.${step.getField()}`)
-      // console.log('  -> step is already processed')
+      console.log(`Skip process(${step.extract}) lv.${step.getDepth()} ${step.getComponent().getName()}.${step.getField()}`)
+      console.log('  (step is already processed)')
 
       return
     }
@@ -627,17 +627,17 @@ class Extractor {
     // In order to avoid risking extracting the same values more than once (e.g.
     // nested components selected with descendant selectors), we must append
     // the exclusion class to all selectors.
-    const selector = step.getSelector() + `:not(${this.alreadyExtractedClass})`
+    const selector = step.getSelector() + `:not(.${this.alreadyExtractedClass})`
 
     // Debug.
-    if (component.getName() === 'Card') {
-      console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
-      console.log(`  ${selector}`)
-      // step.locate()
-    }
+    // if (component.getName() === 'Card') {
+    // }
+    // console.log(`process(${step.extract}) lv.${step.getDepth()} ${component.getName()}.${step.getField()}`)
+    // console.log(`  ${step.getSelector()}`)
+    step.locate()
 
     // Debug.
-    const selectorExists = step.selectorExists()
+    const selectorExists = step.selectorExists(selector)
     if (!selectorExists) {
       console.log(`TODO confirm : selector "${selector}" might be already extracted.`)
     }
@@ -675,16 +675,11 @@ class Extractor {
       }
 
       // Debug.
-      // console.log(`  Children of lv.${component.getDepth()} ${component.getName()} :`)
-      // children.forEach(child => {
-      //   // child.locate('    child :')
-      //   // console.log(`    ${child.getName()} = ${JSON.stringify(child.extracted)}`)
-      // })
-      for (let i = 0; i < children.length; i++) {
-        const child = children[i]
-        // console.log(`    child ${i} = ${child.getName()} = ${JSON.stringify(child.extracted)}`)
-        console.log(`    child ${i} = ${child.getName()} (keys : ${Object.keys(child.extracted)})`)
-      }
+      // for (let i = 0; i < children.length; i++) {
+      //   const child = children[i]
+      //   console.log(`    child ${i} = ${child.getName()} = ${JSON.stringify(child.extracted)}`)
+      //   console.log(`    child ${i} = ${child.getName()} (keys : ${Object.keys(child.extracted)})`)
+      // }
 
       values = children.map(child => {
         return { c: child.getName(), props: child.extracted }
@@ -747,8 +742,8 @@ class Extractor {
 
           if (!(step.getField() in item)) {
             // Debug.
-            console.log(`processFallback() - ${component.getName()} '${step.getMultiFieldName()}[${i}].${step.getField()}' (${step.extract}) :`)
-            console.log(`  item ${i} is missing prop '${step.getField()}'`)
+            // console.log(`processFallback() - ${component.getName()} '${step.getMultiFieldName()}[${i}].${step.getField()}' (${step.extract}) :`)
+            // console.log(`  item ${i} is missing prop '${step.getField()}'`)
 
             const fallbackStep = await this.createFallbackStep(step.config, component)
             if (!fallbackStep) {
@@ -844,7 +839,8 @@ class Extractor {
     // Debug.
     const component = step.getComponent()
     if (component.getName() === 'Card') {
-      console.log(`extract() lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      console.log(`extract() lv.${step.getDepth()} ${component.getName()}.${step.getField()}`)
+      console.log(`  selector = ${selector}`)
       console.log(`  values = ${values}`)
     }
 
