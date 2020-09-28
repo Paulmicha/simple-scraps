@@ -37,7 +37,7 @@ class Component extends Iterable {
     const subField = step.getField()
 
     // Debug.
-    // console.log(`setMultiFieldValues() : ${fieldGroup}[].${subField} (${values.length} values)`)
+    console.log(`setMultiFieldValues() : ${fieldGroup}[].${subField} (${values.length} values)`)
 
     if (!(fieldGroup in this.multiFieldGroups)) {
       this.multiFieldGroups[fieldGroup] = []

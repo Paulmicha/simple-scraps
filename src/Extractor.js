@@ -291,8 +291,8 @@ class Extractor {
           this.steps.add(instance)
         } else {
           // Debug.
-          console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} for ${instance.getComponent().getName()}.${instance.getField()}`)
-          console.log(`   Step selector not found : ${instance.getSelector()}`)
+          // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} for ${instance.getComponent().getName()}.${instance.getField()}`)
+          // console.log(`   Step selector not found : ${instance.getSelector()}`)
 
           // Instead, look for a fallback : if it has a selector, it should
           // be tried and if it matches anything, it should be added to the
@@ -630,8 +630,6 @@ class Extractor {
     const selector = step.getSelector() + `:not(.${this.alreadyExtractedClass})`
 
     // Debug.
-    // if (component.getName() === 'Card') {
-    // }
     // console.log(`process(${step.extract}) lv.${step.getDepth()} ${component.getName()}.${step.getField()}`)
     // console.log(`  ${step.getSelector()}`)
     step.locate()
@@ -691,12 +689,13 @@ class Extractor {
     // selectors).
     await dom.addClass(this.pageWorker.page, selector, this.alreadyExtractedClass)
 
-    // Prevent infinite loop by ensuring we only attempt fallback once per
-    // field or prop, or multifield item field or prop.
-    // const fallback = step.getConf('fallback')
-    // if (fallback && !('fallbacksAlreadyTried' in component)) {
-    //   component.fallbacksAlreadyTried = {}
-    // }
+    // Values may still be null at this point.
+    if (!values) {
+      if (step.getConf('fallback')) {
+        await this.processFallback(step, selector)
+      }
+      return
+    }
 
     // Deal with multi-fields groups, e.g. :
     //   - component.MediaGrid.items[].image
@@ -837,20 +836,18 @@ class Extractor {
     }
 
     // Debug.
-    const component = step.getComponent()
-    if (component.getName() === 'Card') {
-      console.log(`extract() lv.${step.getDepth()} ${component.getName()}.${step.getField()}`)
-      console.log(`  selector = ${selector}`)
-      console.log(`  values = ${values}`)
-    }
+    // const component = step.getComponent()
+    // console.log(`extract() lv.${step.getDepth()} ${component.getName()}.${step.getField()}`)
+    // console.log(`  selector = ${selector}`)
+    // console.log(`  values = ${values}`)
 
-    if (values && values.length) {
-      return values
-    }
+    // if (values && values.length) {
+    return values
+    // }
 
     // Provide opportunities to look for other elements in case no values were
     // found.
-    await this.processFallback(step, selector)
+    // await this.processFallback(step, selector)
   }
 }
 
