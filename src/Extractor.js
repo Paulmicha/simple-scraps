@@ -736,7 +736,7 @@ class Extractor {
 
       const multiFieldItems = component.getMultiFieldItems(step)
 
-      if (multiFieldItems.length) {
+      if (multiFieldItems && multiFieldItems.length) {
         for (let i = 0; i < multiFieldItems.length; i++) {
           const item = multiFieldItems[i]
 

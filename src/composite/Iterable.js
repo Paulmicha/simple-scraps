@@ -166,8 +166,9 @@ class Iterable {
     // Convert javascript eval string into CSS selector by adding custom classes
     // on matched elements.
     if (this.getConf('select')) {
+      const componentName = (this.constructor.name === 'Step') ? this.getComponent().getName() : this.getName()
       this.extractor.markedElementsCount++
-      const markerClass = `js-scraps-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
+      const markerClass = `js-${componentName}-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
 
       /* istanbul ignore next */
       await dom.evaluate(
