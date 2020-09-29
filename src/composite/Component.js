@@ -12,6 +12,7 @@ class Component extends Iterable {
     this.container = config ? config.component : null
     this.extracted = {}
     this.multiFieldGroups = {}
+    this.indexedMultiFieldProps = {}
   }
 
   getName () {

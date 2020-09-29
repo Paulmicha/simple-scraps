@@ -18,6 +18,24 @@ const ExportVisitor = require('./composite/ExportVisitor')
  *
  * Collection items are all sub-classes of Iterable, which are traversable via
  * Iterator and exportable via ExportVisitor.
+ *
+ * Order of operations :
+ *   1. INIT phase : converts extraction config into composite trees. Start with
+ *     the root of the DOM (<body>) and scopes selectors recursively until we've
+ *     reached the deepest existing elements matching provided configs.
+ *     Component (= Container or Leaf) instances are created first, then Step
+ *     instances (as they are attached to their Component instances).
+ *   2. EXTRACTION phase : associates values to the composite tree items
+ *     starting from the deepest nesting levels. This allows to produce objects
+ *     that are already structured in a way that makes easier the export phase
+ *     i.e. when reaching Container components, their children would already
+ *     have their fields or props "populated".
+ *   3. EXPORT phase : outputs extracted values into the expected format.
+ *
+ * During the INIT phase, "fallback" extraction configs can provide additional
+ * selectors to look for values that would be used for certain fields or props.
+ * During the EXTRACTION phase, "fallback" lookups may also be triggered if the
+ * "normal" process does not produce any output.
  */
 class Extractor {
   constructor (op, pageWorker, main) {
@@ -284,7 +302,7 @@ class Extractor {
 
         // In case of multi-field props, mark delimiters (if defined).
         if (instance.isMultiField()) {
-          instance.setMultiFieldIndexes()
+          await instance.setMultiFieldIndexes()
         }
 
         // Debug.

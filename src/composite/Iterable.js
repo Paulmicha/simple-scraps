@@ -199,17 +199,16 @@ class Iterable {
 
     // Detect and apply multi-field delimiters.
     if (this.scopeMultiFieldSelector) {
-      await this.scopeMultiFieldSelector()
+      this.scopeMultiFieldSelector()
     }
 
     // Scope based on container component.
     const parentComponent = this.getParentComponent()
-
-    if (parentComponent &&
-      parentComponent.selector &&
-      parentComponent.selector.length &&
-      parentComponent.selector !== ':root') {
-      this.setSelector(`${parentComponent.getSelector()} ${this.getSelector()}`)
+    if (parentComponent) {
+      const parentComponentSelector = parentComponent.getSelector()
+      if (parentComponentSelector.length && parentComponentSelector !== ':root') {
+        this.setSelector(`${parentComponentSelector} ${this.getSelector()}`)
+      }
     }
 
     // When config.parentStep is set, it means we are in a recursive call via a

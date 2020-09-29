@@ -1,3 +1,4 @@
+const dom = require('../utils/dom')
 const Iterable = require('./Iterable')
 
 /**
@@ -16,6 +17,7 @@ class Step extends Iterable {
     this.emit = config.emit
     this.processed = false
     this.component = config.component
+    this.multiFieldScopeDelimiter = ''
   }
 
   getDestination () {
@@ -73,6 +75,8 @@ class Step extends Iterable {
    *   this.as = 'component.MediaGrid.items[].image'
    *   const group = this.getMultiFieldName()
    *   // group = 'items'
+   *   const index = this.getMultiFieldIndex()
+   *   // index = 1
    *   const subField = this.getField()
    *   // subField = 'image'
    */
@@ -99,29 +103,76 @@ class Step extends Iterable {
     if (!this.isMultiField()) {
       return
     }
-    if (!this.getConf('multiFieldScopes')) {
+
+    const component = this.getComponent()
+
+    if (!component.getConf('multiFieldScopes')) {
       return
     }
 
     const multiFieldName = this.getMultiFieldName()
-    const multiFieldScopes = this.getConf('multiFieldScopes')
+    const multiFieldScopes = component.getConf('multiFieldScopes')
 
     if (!(multiFieldName in multiFieldScopes)) {
       return
     }
 
-    this.setSelector(`${multiFieldScopes[multiFieldName]} ${this.getSelector()}`)
+    this.multiFieldScopeDelimiter = multiFieldScopes[multiFieldName]
+
+    // Debug.
+    // console.log(`scopeMultiFieldSelector() - delimiter = ${this.multiFieldScopeDelimiter}`)
+
+    this.setSelector(`${this.multiFieldScopeDelimiter} ${this.getSelector()}`)
   }
 
-  setMultiFieldIndexes () {
+  /**
+   * Attaches a data-attribute to elements corresponding to multi-field items'
+   * props to determine which item of the group they belong to.
+   *
+   * Must run AFTER Iterable.scopeSelector() due to "select" keys handling.
+   */
+  async setMultiFieldIndexes () {
     const component = this.getComponent()
-    const multiFieldName = this.getMultiFieldName()
+    const multiFieldProp = `${this.getMultiFieldName()}.${this.getField()}`
 
-    if (multiFieldName in component.indexedMutliFieldGroups) {
+    if (multiFieldProp in component.indexedMultiFieldProps ||
+      !this.multiFieldScopeDelimiter.length) {
       return
     }
 
-    console.log(`TODO index multi-field group ${multiFieldName}`)
+    // Debug.
+    console.log(`setMultiFieldIndexes() for prop : ${multiFieldProp}`)
+    // this.locate('  for : ')
+
+    // The elements that delimit our multi-field items start at the component
+    // scope.
+    const delimitersSelector = `${component.getSelector()} ${this.multiFieldScopeDelimiter}`
+    const scopeSelectorRegexSafe = delimitersSelector.replace(/[.*+\-?^${}()|[\]\\]/g, '\\$&')
+    const currentPropSelector = this.getSelector().replace(new RegExp(`^${scopeSelectorRegexSafe}`), '')
+
+    // Debug.
+    // console.log(`  delimitersSelector = ${delimitersSelector}`)
+    // console.log(`  currentPropSelector = ${currentPropSelector}`)
+
+    /* istanbul ignore next */
+    await dom.evaluate(
+      this.extractor.pageWorker.page,
+      (delimitersSelector, multiFieldScopeDelimiter) => {
+        [...document.querySelectorAll(delimitersSelector)].map((e, i) => {
+          // e.classList.add()
+          e.setAttribute('data-simple-scraps-multi-field-i', i)
+          // [...e.querySelectorAll(currentPropSelector)]
+        })
+      },
+      delimitersSelector,
+      currentPropSelector
+    )
+
+    component.indexedMultiFieldProps[multiFieldProp] = true
+  }
+
+  getMultiFieldIndex () {
+    // TODO (wip)
   }
 
   isProcessed () {
