@@ -147,8 +147,8 @@ class Step extends Iterable {
     // The elements that delimit our multi-field items start at the component
     // scope.
     const delimitersSelector = `${component.getSelector()} ${this.multiFieldScopeDelimiter}`
-    const scopeSelectorRegexSafe = delimitersSelector.replace(/[.*+\-?^${}()|[\]\\]/g, '\\$&')
-    const currentPropSelector = this.getSelector().replace(new RegExp(`^${scopeSelectorRegexSafe}`), '')
+    // const scopeSelectorRegexSafe = delimitersSelector.replace(/[.*+\-?^${}()|[\]\\]/g, '\\$&')
+    // const currentPropSelector = this.getSelector().replace(new RegExp(`^${scopeSelectorRegexSafe}`), '')
 
     // Debug.
     // console.log(`  delimitersSelector = ${delimitersSelector}`)
@@ -157,15 +157,21 @@ class Step extends Iterable {
     /* istanbul ignore next */
     await dom.evaluate(
       this.extractor.pageWorker.page,
-      (delimitersSelector, multiFieldScopeDelimiter) => {
-        [...document.querySelectorAll(delimitersSelector)].map((e, i) => {
-          // e.classList.add()
+      (multiFieldScopeDelimiter, delimitersSelector, currentPropSelector) => {
+        const itemsWrappers = [...document.querySelectorAll(delimitersSelector)]
+        itemsWrappers.map((e, i) => {
           e.setAttribute('data-simple-scraps-multi-field-i', i)
-          // [...e.querySelectorAll(currentPropSelector)]
+        })
+
+        const currentPropElements = [...document.querySelectorAll(currentPropSelector)]
+        currentPropElements.map((e) => {
+          const index = e.closest(multiFieldScopeDelimiter).getAttribute('data-simple-scraps-multi-field-i')
+          e.setAttribute('data-simple-scraps-multi-field-i', index)
         })
       },
+      this.multiFieldScopeDelimiter,
       delimitersSelector,
-      currentPropSelector
+      this.getSetting()
     )
 
     component.indexedMultiFieldProps[multiFieldProp] = true
