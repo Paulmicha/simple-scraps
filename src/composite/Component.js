@@ -37,7 +37,7 @@ class Component extends Iterable {
     const subField = step.getField()
 
     // Debug.
-    console.log(`setMultiFieldValues() : ${fieldGroup}[].${subField} (${values.length} values)`)
+    console.log(`setMultiFieldValues() : ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)
 
     if (!(fieldGroup in this.multiFieldGroups)) {
       this.multiFieldGroups[fieldGroup] = []
@@ -70,13 +70,22 @@ class Component extends Iterable {
   }
 
   multiFieldValuesSetter (step, fieldGroup, i, subField, values) {
+    // Debug.
+    console.log(`  multiFieldValuesSetter() : ${fieldGroup}[${i}].${subField}`)
+
     if (step.fieldIsNestedContainer()) {
       if (!(subField in this.multiFieldGroups[fieldGroup][i])) {
         this.multiFieldGroups[fieldGroup][i][subField] = []
       }
       this.multiFieldGroups[fieldGroup][i][subField].push(values)
+
+      // Debug.
+      console.log(`    PUSH ${JSON.stringify(values)}`)
     } else {
       this.multiFieldGroups[fieldGroup][i][subField] = values
+
+      // Debug.
+      console.log(`    SET ${values}`)
     }
   }
 

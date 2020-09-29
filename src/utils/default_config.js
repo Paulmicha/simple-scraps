@@ -33,6 +33,8 @@ const setting = (key) => {
   defaults.extractionContainerTypes = ['components']
   defaults.maxExtractionNestingDepth = 9
   defaults.selectorExistsTimeout = 150
+  defaults.selectorExistsRetries = 2
+  defaults.selectorExistsRetriesMul = 1.75
 
   if (key in defaults) {
     return defaults[key]

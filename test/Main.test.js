@@ -11,7 +11,7 @@ nestedComponentsConfig.start[0].url = urls.article
 // having too many headless browsers open at the same time (each having multiple
 // pages open to process operations concurrently already).
 // See https://github.com/avajs/ava/blob/master/docs/01-writing-tests.md
-/* test.serial('1. Extract a single string (plain text + HTML markup)', async t => {
+test.serial('1. Extract a single string (plain text + HTML markup)', async t => {
   // When an array is passed as 1st constructor argument, it means that only
   // entry points are specified.
   const scraps = new SimpleScraps([
@@ -52,9 +52,9 @@ nestedComponentsConfig.start[0].url = urls.article
   })
 
   await scraps.run()
-}) */
+})
 
-/* test.serial('2. Extract a simple component', async t => {
+test.serial('2. Extract a simple component', async t => {
   const scraps = new SimpleScraps({
     settings: {
       crawlDelay: false
@@ -97,13 +97,13 @@ nestedComponentsConfig.start[0].url = urls.article
   })
 
   await scraps.run()
-}) */
+})
 
 test.serial('3. Extract nested components', async t => {
   const scraps = new SimpleScraps(nestedComponentsConfig)
 
-  // TODO (wip) debug : remove when done.
-  scraps.setSetting('maxExtractionNestingDepth', 4)
+  // Debug.
+  // scraps.setSetting('maxExtractionNestingDepth', 4)
 
   scraps.on('store.extraction.result', (entity, entityType, bundle, url, pageWorker) => {
     // While we're at it, test that the entity type and bundle mapping is
@@ -112,8 +112,7 @@ test.serial('3. Extract nested components', async t => {
     t.is('article', bundle)
 
     // At the root level, there should be exactly 1 Lede, and 1 NavTabs.
-    // TODO [wip] see run() TODO in src/extract.js
-    // t.is(2, entity.content.length)
+    t.is(2, entity.content.length)
 
     // Debug.
     console.log('TODO (wip) Extract nested components :')

@@ -236,11 +236,22 @@ class Iterable {
       return this.extractor.selectorExists[selector]
     }
 
+    // Debug.
+    // console.log(`selector exists ? ${selector}`)
+
     this.extractor.selectorExists[selector] = await dom.exists(
       this.extractor.pageWorker.page,
       selector,
-      this.extractor.main.getSetting('selectorExistsTimeout')
+      {
+        timeoutBase: this.extractor.main.getSetting('selectorExistsTimeout'),
+        maxRetries: this.extractor.main.getSetting('selectorExistsRetries'),
+        multiplicator: this.extractor.main.getSetting('selectorExistsRetriesMul')
+      }
     )
+
+    // Debug.
+    // console.log(`selector exists ? ${selector}`)
+    // console.log(`  -> ${this.extractor.selectorExists[selector]}`)
 
     return this.extractor.selectorExists[selector]
   }

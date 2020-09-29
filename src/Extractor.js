@@ -33,7 +33,7 @@ class Extractor {
     // and if they have already been extracted in case elements get matched
     // multiple times from higher depth levels.
     this.selectorExists = {}
-    this.selectorAlreadyExtracted = {}
+    this.selectorsExtracted = []
 
     // In order to support selectors using jQuery-like syntax, we need a unique
     // counter for hash IDs to track custom classes added to the page elements
@@ -285,6 +285,21 @@ class Extractor {
         // Debug.
         // console.log(`iterableFactory(${type})`)
         // instance.locate('  ')
+
+        // If this step's component selector differs from this step's and
+        // doens't match anything, there's no need to check it.
+        const component = instance.getComponent()
+        if (component.getSelector() !== instance.getSelector() && !await component.selectorExists()) {
+          // Debug.
+          // console.log('  -> step is inside component with a selector that does not exist')
+          // instance.locate()
+
+          // In this case, check fallback directly.
+          if ('fallback' in config && 'selector' in config.fallback) {
+            await this.createFallbackStep(config, parentComponent, newComponent)
+          }
+          break
+        }
 
         // If nothing matches scoped selector, do not add it to the collection.
         if (await instance.selectorExists()) {
@@ -567,7 +582,7 @@ class Extractor {
     })
 
     // Debug.
-    console.log(`run() ${this.steps.count()} selectors, ${this.extracted.count()} components.`)
+    // console.log(`run() ${this.steps.count()} selectors, ${this.extracted.count()} components.`)
     // console.log(`  this.selectorExists = ${JSON.stringify(this.selectorExists, null, 2)}`)
 
     // Debug.
@@ -585,8 +600,10 @@ class Extractor {
     await this.iterator.traverseAsync(async step => await this.process(step))
 
     // Debug.
-    console.log('Extracted components :')
-    this.extractedIterator.traverse(component => component.locate())
+    // console.log('Extracted selectors :')
+    // console.log(this.selectorsExtracted)
+    // console.log('Extracted components :')
+    // this.extractedIterator.traverse(component => component.locate())
 
     // 4. Generate the extraction result object.
     // When no nested fields were found, we are extracting a single entity from
@@ -624,6 +641,8 @@ class Extractor {
     const component = step.getComponent()
     const field = step.getField()
 
+    this.selectorsExtracted.push(step.getSelector())
+
     // In order to avoid risking extracting the same values more than once (e.g.
     // nested components selected with descendant selectors), we must append
     // the exclusion class to all selectors.
@@ -632,13 +651,13 @@ class Extractor {
     // Debug.
     // console.log(`process(${step.extract}) lv.${step.getDepth()} ${component.getName()}.${step.getField()}`)
     // console.log(`  ${step.getSelector()}`)
-    step.locate()
+    // step.locate()
 
     // Debug.
-    const selectorExists = step.selectorExists(selector)
-    if (!selectorExists) {
-      console.log(`TODO confirm : selector "${selector}" might be already extracted.`)
-    }
+    // const selectorExists = step.selectorExists(selector)
+    // if (!selectorExists) {
+    //   console.log(`TODO confirm : selector "${selector}" might be already extracted.`)
+    // }
 
     // "Normal" extraction deals with field or prop values like plain text,
     // markup, attributes, or customized elements extraction process using event
@@ -653,7 +672,7 @@ class Extractor {
       }
 
       // Debug.
-      // console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
       // console.log(`  children.length = ${component.getChildren().length}`)
 
       const children = component.getChildren()
@@ -662,7 +681,7 @@ class Extractor {
       // Nothing to set when there are no children.
       if (!children.length) {
         // Debug.
-        // console.log(`  No children for component ${component.getName()}`)
+        console.log(`  No children for component ${component.getName()}`)
         // console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
 
         if (step.getConf('fallback')) {
@@ -682,6 +701,9 @@ class Extractor {
       values = children.map(child => {
         return { c: child.getName(), props: child.extracted }
       })
+
+      // Debug.
+      console.log(`  values = ${JSON.stringify(values.map(v => v.c))}`)
     }
 
     // Mark matched selector as extracted to avoid risking extracting the same

@@ -10,12 +10,31 @@ const minifyHtml = require('html-minifier-terser').minify
  *
  * See https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pageselector
  */
-const exists = async (page, selector, timeout) => {
+const exists = async (page, selector, options) => {
+  const { timeoutBase, maxRetries, multiplicator } = options
   let result = false
+  let timeout = timeoutBase
+  let remainingRetries = maxRetries
 
-  await page.waitForSelector(selector, { timeout })
-    .then(() => { result = true })
-    .catch(() => { result = false })
+  if (timeoutBase && remainingRetries) {
+    while (!result && remainingRetries) {
+      remainingRetries--
+
+      // Debug.
+      // console.log(`selector exists ? ${selector}`)
+      // console.log(`  timeout = ${timeout}`)
+      // console.log(`  remainingRetries = ${remainingRetries}`)
+
+      await page.waitForSelector(selector, { timeout })
+        .then(() => { result = true })
+        .catch(() => { result = false })
+      timeout = timeout * multiplicator
+    }
+  } else {
+    await page.waitForSelector(selector)
+      .then(() => { result = true })
+      .catch(() => { result = false })
+  }
 
   return result
 }
