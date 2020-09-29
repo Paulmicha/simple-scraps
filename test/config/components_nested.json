@@ -82,12 +82,12 @@
       "select": "[...document.querySelectorAll('.card-header [data-toggle=collapse]')].map(e => e.closest('.card').parentElement)",
       "extract": [
         {
-          "selector": "> .card > .card-header [data-toggle=collapse]",
+          "selector": "> .card-header [data-toggle=collapse]",
           "extract": "text",
           "as": "component.Accordion.items[].title"
         },
         {
-          "selector": "> .card > .collapse > .card-body",
+          "selector": "> .collapse > .card-body",
           "extract": "components",
           "as": "component.Accordion.items[].content",
           "fallback": {
@@ -96,7 +96,10 @@
           }
         }
       ],
-      "as": "component.Accordion"
+      "as": "component.Accordion",
+      "multiFieldScopes": {
+        "items": "> .card"
+      }
     }
   ]
 }

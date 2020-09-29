@@ -95,6 +95,35 @@ class Step extends Iterable {
     return name
   }
 
+  scopeMultiFieldSelector () {
+    if (!this.isMultiField()) {
+      return
+    }
+    if (!this.getConf('multiFieldScopes')) {
+      return
+    }
+
+    const multiFieldName = this.getMultiFieldName()
+    const multiFieldScopes = this.getConf('multiFieldScopes')
+
+    if (!(multiFieldName in multiFieldScopes)) {
+      return
+    }
+
+    this.setSelector(`${multiFieldScopes[multiFieldName]} ${this.getSelector()}`)
+  }
+
+  setMultiFieldIndexes () {
+    const component = this.getComponent()
+    const multiFieldName = this.getMultiFieldName()
+
+    if (multiFieldName in component.indexedMutliFieldGroups) {
+      return
+    }
+
+    console.log(`TODO index multi-field group ${multiFieldName}`)
+  }
+
   isProcessed () {
     return this.processed
   }

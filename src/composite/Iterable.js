@@ -197,6 +197,12 @@ class Iterable {
       return
     }
 
+    // Detect and apply multi-field delimiters.
+    if (this.scopeMultiFieldSelector) {
+      await this.scopeMultiFieldSelector()
+    }
+
+    // Scope based on container component.
     const parentComponent = this.getParentComponent()
 
     if (parentComponent &&

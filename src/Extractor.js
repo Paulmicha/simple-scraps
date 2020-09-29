@@ -282,6 +282,11 @@ class Extractor {
         instance.setAncestors()
         await instance.scopeSelector()
 
+        // In case of multi-field props, mark delimiters (if defined).
+        if (instance.isMultiField()) {
+          instance.setMultiFieldIndexes()
+        }
+
         // Debug.
         // console.log(`iterableFactory(${type})`)
         // instance.locate('  ')
