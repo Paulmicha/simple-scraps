@@ -75,8 +75,6 @@ class Step extends Iterable {
    *   this.as = 'component.MediaGrid.items[].image'
    *   const group = this.getMultiFieldName()
    *   // group = 'items'
-   *   const index = this.getMultiFieldIndex()
-   *   // index = 1
    *   const subField = this.getField()
    *   // subField = 'image'
    */
@@ -155,14 +153,14 @@ class Step extends Iterable {
     }
 
     // Debug.
-    console.log(`setMultiFieldIndexes() for lv.${this.getDepth()} ${component.getName()}.${multiFieldProp}`)
+    console.log(`setMultiFieldIndexes() for lv.${component.getDepth()} ${component.getName()}.${multiFieldProp}`)
     // this.locate('  for : ')
 
     // The elements that delimit our multi-field items start at the component
     // scope.
     const delimitersSelector = this.multiFieldScopeDelimiter.length
       ? `${component.getSelector()} ${this.multiFieldScopeDelimiter}`
-      : component.getSelector()
+      : this.getSelector()
     // const scopeSelectorRegexSafe = delimitersSelector.replace(/[.*+\-?^${}()|[\]\\]/g, '\\$&')
     // const currentPropSelector = this.getSelector().replace(new RegExp(`^${scopeSelectorRegexSafe}`), '')
 
@@ -181,7 +179,7 @@ class Step extends Iterable {
           e.setAttribute('data-simple-scraps-multi-field-i', i + 1)
 
           // Debug.
-          console.log(`  i=${e.getAttribute('data-simple-scraps-multi-field-i')} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">'`)
+          console.log(`  i=${e.getAttribute('data-simple-scraps-multi-field-i')} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
         })
         // 2. Apply that index on the element(s) from which the current prop
         // value(s) will be extracted.
@@ -194,7 +192,7 @@ class Step extends Iterable {
               e.setAttribute('data-simple-scraps-multi-field-i', index)
 
               // Debug.
-              console.log(`  index=${index} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">'`)
+              console.log(`  index=${index} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
             }
           })
         }
@@ -228,6 +226,47 @@ class Step extends Iterable {
     if (indexes) {
       // return indexes.filter(i => i)
       return indexes
+    }
+  }
+
+  /**
+   * Returns an array of numerical indexes corresponding to the wrapper
+   * element(s) of all matched components in current multi-field prop.
+   *
+   * @example
+   *  // For this extraction config :
+   *  {
+   *    "selector": "> .tab-content > .tab-pane",
+   *    "extract": "components",
+   *    "as": "component.NavTabs.items[].content"
+   *  }
+   *  // When lower levels return e.g. 3 components, calling this :
+   *  const indexes = step.getMultiFieldNestedContainerPropIndexes()
+   *  // Would give e.g. :
+   *  // [2,1,1]
+   *  // -> Meaning : 1st component belongs to multi-field item 2, and the 2nd
+   *  // and 3rd components to item 1.
+   */
+  async getMultiFieldNestedContainerPropIndexes () {
+    const component = this.getComponent()
+    if (component.constructor.name !== 'Container') {
+      return
+    }
+    const children = component.getChildren()
+      .filter(child => JSON.stringify(child.extracted) !== '{}')
+
+    // Debug.
+    console.log(`getMultiFieldNestedContainerPropIndexes() - ${children.length} children`)
+
+    if (!children.length) {
+      return
+    }
+
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i]
+
+      // Debug.
+      console.log(`  child ${i} : lv.${child.getDepth()} ${child.getName()}`)
     }
   }
 

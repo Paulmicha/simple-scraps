@@ -34,9 +34,15 @@ class Component extends Iterable {
    */
   async setMultiFieldValues (step, values, index) {
     let i = 0
+    let indexes = null
     const fieldGroup = step.getMultiFieldName()
     const subField = step.getField()
-    const indexes = await step.getMultiFieldCurrentPropIndexes()
+
+    if (!step.fieldIsNestedContainer()) {
+      indexes = await step.getMultiFieldCurrentPropIndexes()
+    } else {
+      indexes = await step.getMultiFieldNestedContainerPropIndexes()
+    }
 
     // Debug.
     console.log(`setMultiFieldValues() : lv.${this.getDepth()} ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)

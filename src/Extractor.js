@@ -695,7 +695,11 @@ class Extractor {
       }
 
       // Debug.
-      console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      if (step.isMultiField()) {
+        console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getMultiFieldName()}[${step.getMultiFieldNestedContainerPropIndexes()}].${step.getField()}`)
+      } else {
+        console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      }
       // console.log(`  children.length = ${component.getChildren().length}`)
 
       const children = component.getChildren()
