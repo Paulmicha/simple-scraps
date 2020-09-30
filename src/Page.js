@@ -1,7 +1,13 @@
 const cashPath = require.resolve('cash-dom')
-const debug = require('debug')
-const debugConsole = debug('simple-scraps:console')
+// const debug = require('debug')
+// const debugConsole = debug('simple-scraps:console')
+// const debugError = debug('simple-scraps:error')
 // const debugDialog = debug('simple-scraps:dialog')
+
+// Set all output to go via console.info
+// @see https://github.com/visionmedia/debug
+// TODO (wip) this fails. Workaround not found.
+// debug.log = console.info.bind(console)
 
 /**
  * Defines a single headless browser page "worker".
@@ -11,27 +17,6 @@ const debugConsole = debug('simple-scraps:console')
 class Page {
   constructor (main) {
     this.main = main
-
-    // There's a common store we need to avoid prepending several times the same
-    // CSS selector prefix for scoping nested components.
-    // @see getExtractionContexts() in src/component.js
-    this.componentScopeProcessed = []
-
-    // TODO below is now obsolete, to remove when confirmed.
-    // TODO (wip) other refactor in progress.
-    // @see preprocessExtractor()
-    // this.componentsExtracted = []
-    // To avoid component nesting problem (.c-card inside another component
-    // -> potential multiple matches from root to deepest nesting levels), we
-    // need a way to start extracting deepest levels + mark the component as
-    // extracted.
-    // So before actually extracting components, we must check if a it was not
-    // previously matched and already extracted.
-    // This property on the Page object itself will store all "components" field
-    // scope (which are built recursively from config) in order to process them
-    // them during a second "pass".
-    // @see runSecondPass()
-    // this.extractionPlaceholders = []
   }
 
   /**
@@ -49,10 +34,15 @@ class Page {
    * Attaches page event handlers and navigates to given URL.
    */
   async open (url) {
-    this.page.on('pageerror', text => debugConsole(`${text} (in : ${url})`))
-    // this.page.on('console', msg => console.log(`${msg.type()} ${msg.text()} at ${url}`))
+    // TODO (wip) workaround not found.
+    // this.page.on('pageerror', text => debugError(`${text} (in : ${url})`))
+    // this.page.on('console', msg => debugConsole(`${msg.type()} ${msg.text()} at ${url}`))
+    // this.page.on('dialog', dialog => this.handleDialog(dialog, url))
+    // this.page.on('close', () => debugConsole('--- The browser page was closed ---'))
+    this.page.on('pageerror', text => console.log(`${text} (in : ${url})`))
+    this.page.on('console', msg => console.log(`${msg.text()}`))
     this.page.on('dialog', dialog => this.handleDialog(dialog, url))
-    this.page.on('close', () => console.log('The browser page was closed.'))
+    this.page.on('close', () => console.log('--- The browser page was closed ---'))
 
     await this.page.goto(url)
 

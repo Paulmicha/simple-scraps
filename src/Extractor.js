@@ -704,7 +704,7 @@ class Extractor {
       // Nothing to set when there are no children.
       if (!children.length) {
         // Debug.
-        console.log(`  No children for component ${component.getName()}`)
+        // console.log(`  No children for component ${component.getName()}`)
         // console.log(`  -> fallback ? '${step.getConf('fallback')}'`)
 
         if (step.getConf('fallback')) {

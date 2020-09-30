@@ -27,7 +27,8 @@
         {
           "selector": "> .nav-tabs > li > .nav-link",
           "extract": "text",
-          "as": "component.NavTabs.items[].title"
+          "as": "component.NavTabs.items[].title",
+          "multiFieldScope": "> .nav-tabs > li"
         },
         {
           "selector": "> .tab-content > .tab-pane",

@@ -155,8 +155,8 @@ class Step extends Iterable {
     }
 
     // Debug.
-    console.log(`setMultiFieldIndexes() for prop : ${multiFieldProp}`)
-    this.locate('  for : ')
+    console.log(`setMultiFieldIndexes() for lv.${this.getDepth()} ${component.getName()}.${multiFieldProp}`)
+    // this.locate('  for : ')
 
     // The elements that delimit our multi-field items start at the component
     // scope.
@@ -167,7 +167,7 @@ class Step extends Iterable {
     // const currentPropSelector = this.getSelector().replace(new RegExp(`^${scopeSelectorRegexSafe}`), '')
 
     // Debug.
-    console.log(`  delimitersSelector = ${delimitersSelector}`)
+    // console.log(`  delimitersSelector = ${delimitersSelector}`)
     // console.log(`  currentPropSelector = ${currentPropSelector}`)
 
     /* istanbul ignore next */
@@ -179,6 +179,9 @@ class Step extends Iterable {
         const itemsWrappers = [...document.querySelectorAll(delimitersSelector)]
         itemsWrappers.map((e, i) => {
           e.setAttribute('data-simple-scraps-multi-field-i', i + 1)
+
+          // Debug.
+          console.log(`  i=${e.getAttribute('data-simple-scraps-multi-field-i')} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">'`)
         })
         // 2. Apply that index on the element(s) from which the current prop
         // value(s) will be extracted.
@@ -189,6 +192,9 @@ class Step extends Iterable {
               .getAttribute('data-simple-scraps-multi-field-i')
             if (index) {
               e.setAttribute('data-simple-scraps-multi-field-i', index)
+
+              // Debug.
+              console.log(`  index=${index} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">'`)
             }
           })
         }
@@ -198,6 +204,10 @@ class Step extends Iterable {
     )
 
     component.indexedMultiFieldProps[multiFieldProp] = true
+
+    // Debug.
+    // const indexes = await this.getMultiFieldCurrentPropIndexes()
+    // console.log(`  indexes = '${indexes}'`)
   }
 
   /**
@@ -216,7 +226,8 @@ class Step extends Iterable {
       'data-simple-scraps-multi-field-i'
     )
     if (indexes) {
-      return indexes.filter(i => i)
+      // return indexes.filter(i => i)
+      return indexes
     }
   }
 

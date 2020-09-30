@@ -46,9 +46,9 @@ class Component extends Iterable {
       this.multiFieldGroups[fieldGroup] = []
     }
 
-    if (!indexes) {
+    if (indexes) {
       for (i = 0; i < indexes.length; i++) {
-        const index = indexes[i]
+        const index = indexes[i] - 1
         if (!this.multiFieldGroups[fieldGroup][index]) {
           this.multiFieldGroups[fieldGroup][index] = {}
         }
@@ -83,12 +83,13 @@ class Component extends Iterable {
       this.multiFieldGroups[fieldGroup][i][subField].push(values)
 
       // Debug.
-      console.log(`    PUSH ${JSON.stringify(values)}`)
+      // console.log(`    PUSH ${JSON.stringify(values)}`)
+      console.log(`    PUSH ${values}`)
     } else {
-      this.multiFieldGroups[fieldGroup][i][subField] = values
+      this.multiFieldGroups[fieldGroup][i][subField] = values[i]
 
       // Debug.
-      console.log(`    SET ${values}`)
+      console.log(`    SET ${values[i]}`)
     }
   }
 
