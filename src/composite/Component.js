@@ -1,3 +1,4 @@
+const dom = require('../utils/dom')
 const Iterable = require('./Iterable')
 
 /**
@@ -39,14 +40,14 @@ class Component extends Iterable {
     const subField = step.getField()
 
     if (!step.fieldIsNestedContainer()) {
-      indexes = await step.getMultiFieldCurrentPropIndexes()
+      indexes = await step.getMultiFieldPropIndexes()
     } else {
       indexes = await step.getMultiFieldNestedContainerPropIndexes()
     }
 
     // Debug.
     console.log(`setMultiFieldValues() : lv.${this.getDepth()} ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)
-    console.log(`  multiFieldIndex = ${indexes}`)
+    console.log(`  indexes = ${indexes}`)
 
     if (!(fieldGroup in this.multiFieldGroups)) {
       this.multiFieldGroups[fieldGroup] = []
@@ -101,6 +102,23 @@ class Component extends Iterable {
 
   getMultiFieldItems (step) {
     return this.multiFieldGroups[step.getMultiFieldName()]
+  }
+
+  async setElementLink () {
+    this.extractor.markedElementsCount++
+    const id = `lv${this.getDepth()}-${this.getName()}-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
+
+    /* istanbul ignore next */
+    await dom.evaluate(
+      this.extractor.pageWorker.page,
+      (selector, id) => {
+        [...document.querySelectorAll(selector)].map((e, i) => {
+          e.setAttribute('data-simple-scraps-cid', `${id}-delta-${i}`)
+        })
+      },
+      this.getSelector(),
+      id
+    )
   }
 }
 

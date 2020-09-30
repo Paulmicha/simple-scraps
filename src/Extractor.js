@@ -56,6 +56,12 @@ class Extractor {
     // In order to support selectors using jQuery-like syntax, we need a unique
     // counter for hash IDs to track custom classes added to the page elements
     // that need to be "marked".
+    // @see Iterable.scopeSelector()
+    // The same counter is used for link IDs between component instances and
+    // their corresponding DOM elements (we don't care about mixing both use
+    // cases in the same counter here, because we just need unique numbers per
+    // extraction process).
+    // @see Component.setElementLink()
     this.markedElementsCount = 0
     this.hashids = new Hashids('SimpleScraps', 10)
 
@@ -466,6 +472,11 @@ class Extractor {
    *     },
    *     ... (rest of components extraction configs)
    *   ]
+   *
+   * TODO (wip) check handling of multiple matches of same component in same
+   * scope
+   * @see Component.setElementLink()
+   * @see Component.getElementLink()
    */
   async init (configs, parentConfig, nestingLevel, parentStep) {
     const container = parentConfig.component
@@ -731,6 +742,9 @@ class Extractor {
 
       // Debug.
       console.log(`  values = ${JSON.stringify(values.map(v => v.c))}`)
+
+      // TODO we need a way to get back the instance from elements matched later
+      // on in Step.getMultiFieldNestedContainerPropIndexes().
     }
 
     // Mark matched selector as extracted to avoid risking extracting the same

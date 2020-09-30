@@ -204,7 +204,7 @@ class Step extends Iterable {
     component.indexedMultiFieldProps[multiFieldProp] = true
 
     // Debug.
-    // const indexes = await this.getMultiFieldCurrentPropIndexes()
+    // const indexes = await this.getMultiFieldPropIndexes()
     // console.log(`  indexes = '${indexes}'`)
   }
 
@@ -217,7 +217,7 @@ class Step extends Iterable {
    * do not share a common wrapper element we could use to regroup and
    * assign the values to the "correct" item.
    */
-  async getMultiFieldCurrentPropIndexes () {
+  async getMultiFieldPropIndexes () {
     const indexes = await dom.attribute(
       this.extractor.pageWorker.page,
       this.getSelector(),
@@ -231,7 +231,8 @@ class Step extends Iterable {
 
   /**
    * Returns an array of numerical indexes corresponding to the wrapper
-   * element(s) of all matched components in current multi-field prop.
+   * element(s) of matched component(s) in current multi-field prop, when it is
+   * a "container" field type (i.e. contains components).
    *
    * @example
    *  // For this extraction config :
@@ -243,7 +244,7 @@ class Step extends Iterable {
    *  // When lower levels return e.g. 3 components, calling this :
    *  const indexes = step.getMultiFieldNestedContainerPropIndexes()
    *  // Would give e.g. :
-   *  // [2,1,1]
+   *  // [2, 1, 1]
    *  // -> Meaning : 1st component belongs to multi-field item 2, and the 2nd
    *  // and 3rd components to item 1.
    */
@@ -262,12 +263,40 @@ class Step extends Iterable {
       return
     }
 
+    const childrenSelectors = []
+    const childrenIndexes = []
+
     for (let i = 0; i < children.length; i++) {
       const child = children[i]
 
       // Debug.
       console.log(`  child ${i} : lv.${child.getDepth()} ${child.getName()}`)
+
+      childrenSelectors.push(child.getSelector())
     }
+
+    /* istanbul ignore next */
+    await dom.evaluate(
+      this.extractor.pageWorker.page,
+      (childrenSelectors, childrenIndexes) => {
+        // 1. Set index on wrapper elements (containing the props of a single
+        // item).
+        [...document.querySelectorAll(childrenSelectors)].map((e) => {
+          const index = e.closest('[data-simple-scraps-multi-field-i]')
+            .getAttribute('data-simple-scraps-multi-field-i')
+          if (index) {
+            childrenIndexes.push(index)
+
+            // Debug.
+            console.log(`  childrenIndexes[${childrenIndexes.length - 1}] = ${index}`)
+          }
+        })
+      },
+      childrenSelectors,
+      childrenIndexes
+    )
+
+    return childrenIndexes
   }
 
   isProcessed () {
