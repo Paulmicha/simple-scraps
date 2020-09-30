@@ -32,13 +32,14 @@ class Component extends Iterable {
    * Stores the extracted value(s) of a single "sub-field" from a multi-field
    * group.
    */
-  setMultiFieldValues (step, values, index) {
+  async setMultiFieldValues (step, values, index) {
     let i = 0
     const fieldGroup = step.getMultiFieldName()
     const subField = step.getField()
 
     // Debug.
     console.log(`setMultiFieldValues() : ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)
+    console.log(`  multiFieldIndex = ${await step.getMultiFieldIndex()}`)
 
     if (!(fieldGroup in this.multiFieldGroups)) {
       this.multiFieldGroups[fieldGroup] = []

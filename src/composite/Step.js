@@ -157,28 +157,33 @@ class Step extends Iterable {
     /* istanbul ignore next */
     await dom.evaluate(
       this.extractor.pageWorker.page,
-      (multiFieldScopeDelimiter, delimitersSelector, currentPropSelector) => {
+      (delimitersSelector, currentPropSelector) => {
+        // 1. Set index on wrapper elements (containing the props of a single
+        // item).
         const itemsWrappers = [...document.querySelectorAll(delimitersSelector)]
         itemsWrappers.map((e, i) => {
           e.setAttribute('data-simple-scraps-multi-field-i', i)
         })
-
+        // 2. Apply that index on the element(s) from which the current prop
+        // value(s) will be extracted.
         const currentPropElements = [...document.querySelectorAll(currentPropSelector)]
-        currentPropElements.map((e) => {
-          const index = e.closest(multiFieldScopeDelimiter).getAttribute('data-simple-scraps-multi-field-i')
-          e.setAttribute('data-simple-scraps-multi-field-i', index)
+        currentPropElements.map(e => {
+          const index = e.closest('[data-simple-scraps-multi-field-i]')
+            .getAttribute('data-simple-scraps-multi-field-i')
+          if (index) {
+            e.setAttribute('data-simple-scraps-multi-field-i', index)
+          }
         })
       },
-      this.multiFieldScopeDelimiter,
       delimitersSelector,
-      this.getSetting()
+      this.getSelector()
     )
 
     component.indexedMultiFieldProps[multiFieldProp] = true
   }
 
-  getMultiFieldIndex () {
-    // TODO (wip)
+  async getMultiFieldIndex () {
+    return await dom.attribute(this.extractor.pageWorker.page, this.getSelector(), 'data-simple-scraps-multi-field-i')
   }
 
   isProcessed () {

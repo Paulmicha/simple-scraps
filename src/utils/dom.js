@@ -182,8 +182,8 @@ const evaluate = async (page, evaluated, ...args) => {
  * Always returns an array.
  */
 const attribute = async (page, selector, attribute) => {
-  return await select(page, selector, items => items.map(
-    item => item[attribute]
+  return await select(page, selector, (items, attribute) => items.map(
+    item => item.getAttribute(attribute)
   ), attribute)
 }
 
