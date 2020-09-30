@@ -141,7 +141,7 @@ class Step extends Iterable {
     }
 
     // Debug.
-    console.log(`setMultiFieldIndexes() for prop : ${multiFieldProp}`)
+    // console.log(`setMultiFieldIndexes() for prop : ${multiFieldProp}`)
     // this.locate('  for : ')
 
     // The elements that delimit our multi-field items start at the component
@@ -162,7 +162,7 @@ class Step extends Iterable {
         // item).
         const itemsWrappers = [...document.querySelectorAll(delimitersSelector)]
         itemsWrappers.map((e, i) => {
-          e.setAttribute('data-simple-scraps-multi-field-i', i)
+          e.setAttribute('data-simple-scraps-multi-field-i', i + 1)
         })
         // 2. Apply that index on the element(s) from which the current prop
         // value(s) will be extracted.
@@ -182,8 +182,24 @@ class Step extends Iterable {
     component.indexedMultiFieldProps[multiFieldProp] = true
   }
 
-  async getMultiFieldIndex () {
-    return await dom.attribute(this.extractor.pageWorker.page, this.getSelector(), 'data-simple-scraps-multi-field-i')
+  /**
+   * Returns an array of numerical indexes corresponding to the wrapper
+   * element(s) of the items of the multi-field group the current prop value(s)
+   * will be part of.
+   *
+   * TODO (wip) some extractions configs must support multi-field items that
+   * do not share a common wrapper element we could use to regroup and
+   * assign the values to the "correct" item.
+   */
+  async getMultiFieldCurrentPropIndexes () {
+    const indexes = await dom.attribute(
+      this.extractor.pageWorker.page,
+      this.getSelector(),
+      'data-simple-scraps-multi-field-i'
+    )
+    if (indexes) {
+      return indexes.filter(i => i)
+    }
   }
 
   isProcessed () {
