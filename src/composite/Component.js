@@ -36,19 +36,18 @@ class Component extends Iterable {
     let i = 0
     const fieldGroup = step.getMultiFieldName()
     const subField = step.getField()
+    const indexes = await step.getMultiFieldCurrentPropIndexes()
 
     // Debug.
-    console.log(`setMultiFieldValues() : ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)
-    console.log(`  multiFieldIndex = ${await step.getMultiFieldCurrentPropIndexes()}`)
+    console.log(`setMultiFieldValues() : lv.${this.getDepth()} ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)
+    console.log(`  multiFieldIndex = ${indexes}`)
 
     if (!(fieldGroup in this.multiFieldGroups)) {
       this.multiFieldGroups[fieldGroup] = []
     }
 
-    const indexes = step.getMultiFieldCurrentPropIndexes()
-
     if (!indexes) {
-      for (let i = 0; i < indexes.length; i++) {
+      for (i = 0; i < indexes.length; i++) {
         const index = indexes[i]
         if (!this.multiFieldGroups[fieldGroup][index]) {
           this.multiFieldGroups[fieldGroup][index] = {}

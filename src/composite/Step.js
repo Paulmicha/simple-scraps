@@ -129,29 +129,45 @@ class Step extends Iterable {
    * Attaches a data-attribute to elements corresponding to multi-field items'
    * props to determine which item of the group they belong to.
    *
+   * There are 3 possibilities to determine what delimits items :
+   * 1. Via component.getConf('multiFieldScopes') - object keyed by multi-field
+   *   group names which returns an unscoped CSS selector pointing at the
+   *   "wrapper" elements (containing all props to extract for each item)
+   * 2. Via this.getConf('multiFieldScope') - allows to specifiy this selector
+   *   on a per-prop basis.
+   * 3. Fallback to this.getSelector() if nothing else was found.
+   *
    * Must run AFTER Iterable.scopeSelector() due to "select" keys handling.
    */
   async setMultiFieldIndexes () {
     const component = this.getComponent()
     const multiFieldProp = `${this.getMultiFieldName()}.${this.getField()}`
 
-    if (multiFieldProp in component.indexedMultiFieldProps ||
-      !this.multiFieldScopeDelimiter.length) {
+    // Memoization (minor optimization).
+    if (multiFieldProp in component.indexedMultiFieldProps) {
       return
     }
 
+    // Items delimitor may have been set during this.scopeMultiFieldSelector().
+    if (!this.multiFieldScopeDelimiter.length && this.getConf('multiFieldScope')) {
+      // Otherwise, look for the "multiFieldScope" in this Step's config.
+      this.multiFieldScopeDelimiter = this.getConf('multiFieldScope')
+    }
+
     // Debug.
-    // console.log(`setMultiFieldIndexes() for prop : ${multiFieldProp}`)
-    // this.locate('  for : ')
+    console.log(`setMultiFieldIndexes() for prop : ${multiFieldProp}`)
+    this.locate('  for : ')
 
     // The elements that delimit our multi-field items start at the component
     // scope.
-    const delimitersSelector = `${component.getSelector()} ${this.multiFieldScopeDelimiter}`
+    const delimitersSelector = this.multiFieldScopeDelimiter.length
+      ? `${component.getSelector()} ${this.multiFieldScopeDelimiter}`
+      : component.getSelector()
     // const scopeSelectorRegexSafe = delimitersSelector.replace(/[.*+\-?^${}()|[\]\\]/g, '\\$&')
     // const currentPropSelector = this.getSelector().replace(new RegExp(`^${scopeSelectorRegexSafe}`), '')
 
     // Debug.
-    // console.log(`  delimitersSelector = ${delimitersSelector}`)
+    console.log(`  delimitersSelector = ${delimitersSelector}`)
     // console.log(`  currentPropSelector = ${currentPropSelector}`)
 
     /* istanbul ignore next */
@@ -166,14 +182,16 @@ class Step extends Iterable {
         })
         // 2. Apply that index on the element(s) from which the current prop
         // value(s) will be extracted.
-        const currentPropElements = [...document.querySelectorAll(currentPropSelector)]
-        currentPropElements.map(e => {
-          const index = e.closest('[data-simple-scraps-multi-field-i]')
-            .getAttribute('data-simple-scraps-multi-field-i')
-          if (index) {
-            e.setAttribute('data-simple-scraps-multi-field-i', index)
-          }
-        })
+        if (currentPropSelector !== delimitersSelector) {
+          const currentPropElements = [...document.querySelectorAll(currentPropSelector)]
+          currentPropElements.map(e => {
+            const index = e.closest('[data-simple-scraps-multi-field-i]')
+              .getAttribute('data-simple-scraps-multi-field-i')
+            if (index) {
+              e.setAttribute('data-simple-scraps-multi-field-i', index)
+            }
+          })
+        }
       },
       delimitersSelector,
       this.getSelector()
