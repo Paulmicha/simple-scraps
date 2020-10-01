@@ -155,46 +155,60 @@ class Iterable {
    *     "select": "[...document.querySelectorAll('.nav-tabs')].map(e => e.closest(section))"
    *   3. Going up then down the DOM tree :
    *     "select": "[...document.querySelectorAll('.nav-tabs')].map(e => [...e.closest(section).querySelectorAll('.something, .something-else')]"
-   *
-   * @param {string} selector (optional) Allows overriding this method's result.
    */
   async scopeSelector (selector) {
-    if (selector) {
-      this.setSelector(selector)
-    }
-
-    // Convert javascript eval string into CSS selector by adding custom classes
-    // on matched elements.
-    if (this.getConf('select')) {
+    // Assign data-attributes and/or classes for tracing back elements to their
+    // component in the next phase.
+    if (this.getConf('select') || this.constructor.name === 'Container') {
       const componentName = (this.constructor.name === 'Step')
         ? this.getComponent().getName()
         : this.getName()
       this.extractor.markedElementsCount++
       const markerClass = `lv${this.getDepth()}-${componentName}-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
 
+      // Convert javascript eval string into CSS selector by adding custom classes
+      // on matched elements.
+      if (this.getConf('select')) {
+        /* istanbul ignore next */
+        await dom.evaluate(
+          this.extractor.pageWorker.page,
+          (strToEval, markerClass) => {
+            const items = eval(strToEval)
+            items.map(e => e.classList.add(markerClass))
+          },
+          this.getConf('select'),
+          markerClass
+        )
+
+        // Debug.
+        // await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
+        // const markup = await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
+        // console.log(`scopeSelector() : .${markerClass} replaces ${this.getSelector()}`)
+        // console.log('markup :')
+        // console.log(markup)
+
+        this.setSelector(`.${markerClass}`)
+      }
+
+      // If current depth is higher, override previous depth.
       /* istanbul ignore next */
       await dom.evaluate(
         this.extractor.pageWorker.page,
-        (strToEval, markerClass) => {
-          const items = eval(strToEval)
-          items.map(e => e.classList.add(markerClass))
+        (selector, depth) => {
+          [...document.querySelectorAll(selector)].map((e, i) => {
+            const previousDepth = e.getAttribute('data-simple-scraps-depth')
+            if (!previousDepth || previousDepth < depth) {
+              e.setAttribute('data-simple-scraps-depth', depth)
+            }
+
+            // Debug.
+            console.log(`depth : ${e.getAttribute('data-simple-scraps-depth')}`)
+            console.log(`  <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
+          })
         },
-        this.getConf('select'),
-        markerClass
+        this.getSelector(),
+        this.getDepth()
       )
-
-      // Debug.
-      // await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
-      // const markup = await dom.markup(this.extractor.pageWorker.page, `.${markerClass}`)
-      // console.log(`scopeSelector() : .${markerClass} replaces ${this.getSelector()}`)
-      // console.log('markup :')
-      // console.log(markup)
-
-      this.setSelector(`.${markerClass}`)
-    }
-
-    if (selector) {
-      return
     }
 
     // Detect and apply multi-field delimiters.

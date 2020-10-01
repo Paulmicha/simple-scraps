@@ -97,6 +97,12 @@ class Step extends Iterable {
     return name
   }
 
+  /**
+   * Prepends multi-field items props selectors for items delimited via
+   * component.getConf('multiFieldScopes') - object keyed by multi-field group
+   * names which returns an unscoped CSS selector pointing at the "wrapper"
+   * elements (containing all props to extract for each item).
+   */
   scopeMultiFieldSelector () {
     if (!this.isMultiField()) {
       return
@@ -265,9 +271,11 @@ class Step extends Iterable {
 
     const childrenSelectors = []
     const childrenIndexes = []
+    let childrenDepth = 0
 
     for (let i = 0; i < children.length; i++) {
       const child = children[i]
+      childrenDepth = child.getDepth()
 
       // Debug.
       console.log(`  child ${i} : lv.${child.getDepth()} ${child.getName()}`)
@@ -278,10 +286,18 @@ class Step extends Iterable {
     /* istanbul ignore next */
     await dom.evaluate(
       this.extractor.pageWorker.page,
-      (childrenSelectors, childrenIndexes) => {
-        // 1. Set index on wrapper elements (containing the props of a single
-        // item).
-        [...document.querySelectorAll(childrenSelectors)].map((e) => {
+      (childrenSelectors, childrenIndexes, childrenDepth) => {
+        [...document.querySelectorAll(childrenSelectors)].map(e => {
+          // Depth must match. TODO (wip)
+          const elDepth = e.getAttribute('data-simple-scraps-depth')
+
+          // Debug.
+          console.log(`  elDepth = ${elDepth} / childrenDepth = ${childrenDepth}`)
+
+          if (elDepth !== childrenDepth) {
+            return
+          }
+
           const index = e.closest('[data-simple-scraps-multi-field-i]')
             .getAttribute('data-simple-scraps-multi-field-i')
           if (index) {
@@ -293,7 +309,8 @@ class Step extends Iterable {
         })
       },
       childrenSelectors,
-      childrenIndexes
+      childrenIndexes,
+      childrenDepth
     )
 
     return childrenIndexes

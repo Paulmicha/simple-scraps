@@ -115,8 +115,8 @@ test.serial('3. Extract nested components', async t => {
     t.is(2, entity.content.length)
 
     // Debug.
-    console.log('TODO (wip) Extract nested components :')
-    console.log(JSON.stringify(entity, null, 2))
+    // console.log('TODO (wip) Extract nested components :')
+    // console.log(JSON.stringify(entity, null, 2))
   })
 
   await scraps.run()

@@ -14,6 +14,7 @@ class Component extends Iterable {
     this.extracted = {}
     this.multiFieldGroups = {}
     this.indexedMultiFieldProps = {}
+    this.cid = null
   }
 
   getName () {
@@ -30,6 +31,41 @@ class Component extends Iterable {
   }
 
   /**
+   * Attaches a unique ID to be able to determine where the component belongs,
+   * i.e. multi-field items or nested containers.
+   *
+   * @see Extractor.process()
+   */
+  async setComponentID (cid) {
+    if (cid) {
+      this.cid = cid
+    } else {
+      this.extractor.markedElementsCount++
+      this.cid = `lv${this.getDepth()}-${this.getName()}-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
+    }
+
+    /* istanbul ignore next */
+    await dom.evaluate(
+      this.extractor.pageWorker.page,
+      (selector, id) => {
+        [...document.querySelectorAll(selector)].map((e, i) => {
+          e.setAttribute('data-simple-scraps-cid', `${id}-delta-${i}`)
+
+          // Debug.
+          // console.log(`setComponentID() : ${id}-delta-${i}`)
+          // console.log(`  <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
+        })
+      },
+      this.getSelector(),
+      this.cid
+    )
+  }
+
+  getComponentID () {
+    return this.cid
+  }
+
+  /**
    * Stores the extracted value(s) of a single "sub-field" from a multi-field
    * group.
    */
@@ -39,14 +75,11 @@ class Component extends Iterable {
     const fieldGroup = step.getMultiFieldName()
     const subField = step.getField()
 
-    // TODO (wip) assign unique class to each Container component  during
-    // scopeSelector() instead ?
-    indexes = await step.getMultiFieldPropIndexes()
-    // if (!step.fieldIsNestedContainer()) {
-    //   indexes = await step.getMultiFieldPropIndexes()
-    // } else {
-    //   indexes = await step.getMultiFieldNestedContainerPropIndexes()
-    // }
+    if (!step.fieldIsNestedContainer()) {
+      indexes = await step.getMultiFieldPropIndexes()
+    } else {
+      indexes = await step.getMultiFieldNestedContainerPropIndexes()
+    }
 
     // Debug.
     console.log(`setMultiFieldValues() : lv.${this.getDepth()} ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)
@@ -84,7 +117,7 @@ class Component extends Iterable {
 
   multiFieldValuesSetter (step, fieldGroup, i, subField, values) {
     // Debug.
-    console.log(`  multiFieldValuesSetter() : ${fieldGroup}[${i}].${subField}`)
+    // console.log(`  multiFieldValuesSetter() : ${fieldGroup}[${i}].${subField}`)
 
     if (step.fieldIsNestedContainer()) {
       if (!(subField in this.multiFieldGroups[fieldGroup][i])) {
@@ -94,34 +127,17 @@ class Component extends Iterable {
 
       // Debug.
       // console.log(`    PUSH ${JSON.stringify(values)}`)
-      console.log(`    PUSH ${values}`)
+      // console.log(`    PUSH ${values}`)
     } else {
       this.multiFieldGroups[fieldGroup][i][subField] = values[i]
 
       // Debug.
-      console.log(`    SET ${values[i]}`)
+      // console.log(`    SET ${values[i]}`)
     }
   }
 
   getMultiFieldItems (step) {
     return this.multiFieldGroups[step.getMultiFieldName()]
-  }
-
-  async setElementLink () {
-    this.extractor.markedElementsCount++
-    const id = `lv${this.getDepth()}-${this.getName()}-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
-
-    /* istanbul ignore next */
-    await dom.evaluate(
-      this.extractor.pageWorker.page,
-      (selector, id) => {
-        [...document.querySelectorAll(selector)].map((e, i) => {
-          e.setAttribute('data-simple-scraps-cid', `${id}-delta-${i}`)
-        })
-      },
-      this.getSelector(),
-      id
-    )
   }
 }
 

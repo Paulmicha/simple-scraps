@@ -61,7 +61,7 @@ class Extractor {
     // their corresponding DOM elements (we don't care about mixing both use
     // cases in the same counter here, because we just need unique numbers per
     // extraction process).
-    // @see Component.setElementLink()
+    // @see Component.setComponentID()
     this.markedElementsCount = 0
     this.hashids = new Hashids('SimpleScraps', 10)
 
@@ -475,11 +475,6 @@ class Extractor {
    *     },
    *     ... (rest of components extraction configs)
    *   ]
-   *
-   * TODO (wip) check handling of multiple matches of same component in same
-   * scope
-   * @see Component.setElementLink()
-   * @see Component.getElementLink()
    */
   async init (configs, parentConfig, nestingLevel, parentStep) {
     const container = parentConfig.component
@@ -709,11 +704,11 @@ class Extractor {
       }
 
       // Debug.
-      if (step.isMultiField()) {
-        console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getMultiFieldName()}[${step.getMultiFieldNestedContainerPropIndexes()}].${step.getField()}`)
-      } else {
-        console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
-      }
+      // if (step.isMultiField()) {
+      //   console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getMultiFieldName()}[${step.getMultiFieldNestedContainerPropIndexes()}].${step.getField()}`)
+      // } else {
+      //   console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getField()}`)
+      // }
       // console.log(`  children.length = ${component.getChildren().length}`)
 
       const children = component.getChildren()
@@ -743,11 +738,17 @@ class Extractor {
         return { c: child.getName(), props: child.extracted }
       })
 
-      // Debug.
-      console.log(`  values = ${JSON.stringify(values.map(v => v.c))}`)
+      // Attach a unique ID to be able to determine where they belong, i.e.
+      // multi-field items or nested containers.
+      component.setComponentID()
+      children.forEach(child => {
+        child.setComponentID(component.getComponentID())
+      })
 
-      // TODO we need a way to get back the instance from elements matched later
-      // on in Step.getMultiFieldNestedContainerPropIndexes().
+      // Debug.
+      console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getMultiFieldName()}[].${step.getField()}`)
+      console.log(`  ${component.getComponentID()} / ${component.getSelector()}`)
+      console.log(`  values = ${JSON.stringify(values.map(v => v.c))}`)
     }
 
     // Mark matched selector as extracted to avoid risking extracting the same
