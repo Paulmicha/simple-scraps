@@ -740,14 +740,15 @@ class Extractor {
 
       // Attach a unique ID to be able to determine where they belong, i.e.
       // multi-field items or nested containers.
-      component.setComponentID()
-      children.forEach(child => {
-        child.setComponentID(component.getComponentID())
-      })
+      // component.setComponentID()
+      // children.forEach(child => {
+      //   child.setComponentID(component.getComponentID())
+      // })
 
       // Debug.
       console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getMultiFieldName()}[].${step.getField()}`)
-      console.log(`  ${component.getComponentID()} / ${component.getSelector()}`)
+      // console.log(`  ${component.getComponentID()} / ${component.getSelector()}`)
+      console.log(`  ${component.getSelector()}`)
       console.log(`  values = ${JSON.stringify(values.map(v => v.c))}`)
     }
 

@@ -14,7 +14,7 @@ class Component extends Iterable {
     this.extracted = {}
     this.multiFieldGroups = {}
     this.indexedMultiFieldProps = {}
-    this.cid = null
+    // this.cid = null
   }
 
   getName () {
@@ -36,34 +36,34 @@ class Component extends Iterable {
    *
    * @see Extractor.process()
    */
-  async setComponentID (cid) {
-    if (cid) {
-      this.cid = cid
-    } else {
-      this.extractor.markedElementsCount++
-      this.cid = `lv${this.getDepth()}-${this.getName()}-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
-    }
+  // async setComponentID (cid) {
+  //   if (cid) {
+  //     this.cid = cid
+  //   } else {
+  //     this.extractor.markedElementsCount++
+  //     this.cid = `lv${this.getDepth()}-${this.getName()}-${this.extractor.hashids.encode(this.extractor.markedElementsCount)}`
+  //   }
 
-    /* istanbul ignore next */
-    await dom.evaluate(
-      this.extractor.pageWorker.page,
-      (selector, id) => {
-        [...document.querySelectorAll(selector)].map((e, i) => {
-          e.setAttribute('data-simple-scraps-cid', `${id}-delta-${i}`)
+  //   /* istanbul ignore next */
+  //   await dom.evaluate(
+  //     this.extractor.pageWorker.page,
+  //     (selector, id) => {
+  //       [...document.querySelectorAll(selector)].map((e, i) => {
+  //         e.setAttribute('data-simple-scraps-cid', `${id}-delta-${i}`)
 
-          // Debug.
-          // console.log(`setComponentID() : ${id}-delta-${i}`)
-          // console.log(`  <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
-        })
-      },
-      this.getSelector(),
-      this.cid
-    )
-  }
+  //         // Debug.
+  //         // console.log(`setComponentID() : ${id}-delta-${i}`)
+  //         // console.log(`  <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
+  //       })
+  //     },
+  //     this.getSelector(),
+  //     this.cid
+  //   )
+  // }
 
-  getComponentID () {
-    return this.cid
-  }
+  // getComponentID () {
+  //   return this.cid
+  // }
 
   /**
    * Stores the extracted value(s) of a single "sub-field" from a multi-field

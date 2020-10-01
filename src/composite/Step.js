@@ -292,11 +292,14 @@ class Step extends Iterable {
           const elDepth = e.getAttribute('data-simple-scraps-depth')
 
           // Debug.
-          console.log(`  elDepth = ${elDepth} / childrenDepth = ${childrenDepth}`)
+          // console.log(`  elDepth = ${elDepth} / childrenDepth = ${childrenDepth}`)
 
-          if (elDepth !== childrenDepth) {
+          if (parseInt(elDepth) !== parseInt(childrenDepth)) {
             return
           }
+
+          // Debug.
+          console.log(`  depth ${elDepth} = ${childrenDepth} for <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
 
           const index = e.closest('[data-simple-scraps-multi-field-i]')
             .getAttribute('data-simple-scraps-multi-field-i')
