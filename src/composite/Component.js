@@ -39,11 +39,14 @@ class Component extends Iterable {
     const fieldGroup = step.getMultiFieldName()
     const subField = step.getField()
 
-    if (!step.fieldIsNestedContainer()) {
-      indexes = await step.getMultiFieldPropIndexes()
-    } else {
-      indexes = await step.getMultiFieldNestedContainerPropIndexes()
-    }
+    // TODO (wip) assign unique class to each Container component  during
+    // scopeSelector() instead ?
+    indexes = await step.getMultiFieldPropIndexes()
+    // if (!step.fieldIsNestedContainer()) {
+    //   indexes = await step.getMultiFieldPropIndexes()
+    // } else {
+    //   indexes = await step.getMultiFieldNestedContainerPropIndexes()
+    // }
 
     // Debug.
     console.log(`setMultiFieldValues() : lv.${this.getDepth()} ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)

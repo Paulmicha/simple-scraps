@@ -363,12 +363,15 @@ class Extractor {
         await instance.scopeSelector()
 
         // Debug.
-        // console.log(`iterableFactory(${type}) : ${instance.getName()}`)
-        // instance.locate('  ')
+        // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
 
         // If nothing matches scoped selector, do not add it to the collection.
         if (await instance.selectorExists()) {
           this.extracted.add(instance)
+
+          // Debug.
+          console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
+          console.log(`   ${instance.getSelector()}`)
         } else {
           // Debug.
           // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
@@ -750,6 +753,8 @@ class Extractor {
     // Mark matched selector as extracted to avoid risking extracting the same
     // values more than once (e.g. nested components selected with descendant
     // selectors).
+    // This relies on the fact that process() runs first on deepest nesting
+    // levels.
     await dom.addClass(this.pageWorker.page, selector, this.alreadyExtractedClass)
 
     // Values may still be null at this point.
