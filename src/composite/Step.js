@@ -190,7 +190,7 @@ class Step extends Iterable {
         // item).
         const itemsWrappers = [...document.querySelectorAll(delimitersSelector)]
         itemsWrappers.map((e, i) => {
-          e.setAttribute('data-simple-scraps-multi-field-i', i + 1)
+          e.setAttribute('data-simple-scraps-multi-field-i', i)
 
           // Debug.
           // console.log(`  i=${e.getAttribute('data-simple-scraps-multi-field-i')} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
@@ -271,7 +271,9 @@ class Step extends Iterable {
       .filter(child => JSON.stringify(child.extracted) !== '{}')
 
     // Debug.
-    console.log(`getMultiFieldNestedContainerPropIndexes() - ${children.length} children`)
+    const fieldGroup = this.getMultiFieldName()
+    const subField = this.getField()
+    console.log(`getMultiFieldNestedContainerPropIndexes() : lv.${component.getDepth()} ${component.getName()}.${fieldGroup}[].${subField} (${children.length} children)`)
 
     if (!children.length) {
       return
@@ -285,7 +287,7 @@ class Step extends Iterable {
       childrenDepth = child.getDepth()
 
       // Debug.
-      console.log(`  child ${i} : lv.${child.getDepth()} ${child.getName()}`)
+      // console.log(`  child ${i} : lv.${child.getDepth()} ${child.getName()}`)
 
       childrenSelectors.push(child.getSelector())
     }
@@ -308,7 +310,7 @@ class Step extends Iterable {
           }
 
           // Debug.
-          console.log(`  depth ${elDepth} = ${childrenDepth} for <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
+          // console.log(`  depth ${elDepth} = ${childrenDepth} for <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
 
           if (e.hasAttribute('data-simple-scraps-multi-field-i')) {
             const index = e.getAttribute('data-simple-scraps-multi-field-i')
@@ -316,7 +318,8 @@ class Step extends Iterable {
               childrenIndexes.push(index)
 
               // Debug.
-              console.log(`  childrenIndexes[${childrenIndexes.length - 1}] = ${index}`)
+              // console.log(`  childrenIndexes[${childrenIndexes.length - 1}] = ${index}`)
+              console.log(`  index = ${index} for <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
             }
           } else {
             const index = e.closest('[data-simple-scraps-multi-field-i]')
@@ -325,7 +328,8 @@ class Step extends Iterable {
               childrenIndexes.push(index)
 
               // Debug.
-              console.log(`  childrenIndexes[${childrenIndexes.length - 1}] = ${index}`)
+              // console.log(`  childrenIndexes[${childrenIndexes.length - 1}] = ${index}`)
+              console.log(`  index = ${index} for <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
             }
           }
         })
@@ -337,7 +341,7 @@ class Step extends Iterable {
     )
 
     // debug.
-    console.log(`  childrenIndexes result = ${childrenIndexes}`)
+    // console.log(`  childrenIndexes result = ${childrenIndexes}`)
 
     return childrenIndexes
   }

@@ -95,7 +95,7 @@ class Component extends Iterable {
 
     if (indexes) {
       for (i = 0; i < indexes.length; i++) {
-        const index = indexes[i] - 1
+        const index = indexes[i]
         if (!this.multiFieldGroups[fieldGroup][index]) {
           this.multiFieldGroups[fieldGroup][index] = {}
         }
@@ -120,6 +120,10 @@ class Component extends Iterable {
   }
 
   multiFieldValuesSetter (step, fieldGroup, i, subField, values) {
+    if (!values[i]) {
+      return
+    }
+
     // Debug.
     // console.log(`  multiFieldValuesSetter() : ${fieldGroup}[${i}].${subField}`)
 
@@ -127,16 +131,16 @@ class Component extends Iterable {
       if (!(subField in this.multiFieldGroups[fieldGroup][i])) {
         this.multiFieldGroups[fieldGroup][i][subField] = []
       }
-      this.multiFieldGroups[fieldGroup][i][subField].push(values)
+      this.multiFieldGroups[fieldGroup][i][subField].push(values[i])
 
       // Debug.
-      // console.log(`    PUSH ${JSON.stringify(values)}`)
-      // console.log(`    PUSH ${values}`)
+      // console.log(`    PUSH ${JSON.stringify(values[i])}`)
+      console.log(`    ${fieldGroup}[${i}].${subField} PUSH ${values[i]}`)
     } else {
       this.multiFieldGroups[fieldGroup][i][subField] = values[i]
 
       // Debug.
-      // console.log(`    SET ${values[i]}`)
+      console.log(`    ${fieldGroup}[${i}].${subField} SET ${values[i]}`)
     }
   }
 

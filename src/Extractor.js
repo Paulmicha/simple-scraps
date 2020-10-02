@@ -370,8 +370,8 @@ class Extractor {
           this.extracted.add(instance)
 
           // Debug.
-          console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
-          console.log(`   ${instance.getSelector()}`)
+          // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
+          // console.log(`   ${instance.getSelector()}`)
         } else {
           // Debug.
           // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
@@ -748,8 +748,8 @@ class Extractor {
       // Debug.
       console.log(`process(${step.extract}) lv.${step.getDepth()} for ${component.getName()}.${step.getMultiFieldName()}[].${step.getField()}`)
       // console.log(`  ${component.getComponentID()} / ${component.getSelector()}`)
-      console.log(`  ${component.getSelector()}`)
-      console.log(`  values = ${JSON.stringify(values.map(v => v.c))}`)
+      // console.log(`  ${component.getSelector()}`)
+      console.log(`  children = ${children.map(child => `lv.${child.getDepth()} ${child.getName()}`).join(', ')}`)
     }
 
     // Mark matched selector as extracted to avoid risking extracting the same
