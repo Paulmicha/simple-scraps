@@ -78,11 +78,19 @@
             >Profile</a>
           </li>
           <li class="nav-item">
+            <a class="nav-link" data-toggle="tab" href="#fallback"
+              role="tab"
+              aria-controls="profile"
+              aria-selected="false"
+            >Fallback test</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link disabled" href="#">Disabled</a>
           </li>
         </ul>
         <div id="myTabContent" class="tab-content">
           <div class="tab-pane fade show active" role="tabpanel" id="home">
+            <h3>This is a h3 title inside tab pane n°1</h3>
             <div class="row">
               <div class="col-lg-12">
                 <p>This tab pane (n°1) contains a card and a blockquote below :</p>
@@ -108,6 +116,7 @@
             </div>
           </div>
           <div class="tab-pane fade" role="tabpanel" id="profile">
+            <h3>This is a h3 title inside tab pane n°2</h3>
             <p>This second tab pane (n°2) content has an accordion :</p>
             <div id="accordion">
               <div class="card">
@@ -195,6 +204,16 @@
               </div>
             </div>
             <p>(end of second tab pane)</p>
+          </div>
+          <div class="tab-pane fade" role="tabpanel" id="fallback">
+            <h3>This is a h3 title inside tab pane n°3</h3>
+            <p>This third tab pane (n°3) content has no components, just "normal" markup.</p>
+            <strong>This is an unordered list :</strong>
+            <ul>
+              <li>This is list item 1</li>
+              <li>This is list item 2</li>
+              <li>This is list item 3</li>
+            </ul>
           </div>
         </div>
       </div>

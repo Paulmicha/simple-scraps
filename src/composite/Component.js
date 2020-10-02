@@ -1,4 +1,4 @@
-const dom = require('../utils/dom')
+// const dom = require('../utils/dom')
 const Iterable = require('./Iterable')
 
 /**
