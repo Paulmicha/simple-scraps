@@ -20,6 +20,14 @@ class Step extends Iterable {
     this.multiFieldScopeDelimiter = ''
   }
 
+  getDepth () {
+    const component = this.getComponent()
+    if (component) {
+      return component.getDepth()
+    }
+    return this.depth
+  }
+
   getDestination () {
     return this.as.split('.')
   }
@@ -159,7 +167,7 @@ class Step extends Iterable {
     }
 
     // Debug.
-    console.log(`setMultiFieldIndexes() for lv.${component.getDepth()} ${component.getName()}.${multiFieldProp}`)
+    // console.log(`setMultiFieldIndexes() for lv.${component.getDepth()} ${component.getName()}.${multiFieldProp}`)
     // this.locate('  for : ')
 
     // The elements that delimit our multi-field items start at the component
@@ -185,7 +193,7 @@ class Step extends Iterable {
           e.setAttribute('data-simple-scraps-multi-field-i', i + 1)
 
           // Debug.
-          console.log(`  i=${e.getAttribute('data-simple-scraps-multi-field-i')} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
+          // console.log(`  i=${e.getAttribute('data-simple-scraps-multi-field-i')} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
         })
         // 2. Apply that index on the element(s) from which the current prop
         // value(s) will be extracted.
@@ -198,7 +206,7 @@ class Step extends Iterable {
               e.setAttribute('data-simple-scraps-multi-field-i', index)
 
               // Debug.
-              console.log(`  index=${index} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
+              // console.log(`  index=${index} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
             }
           })
         }
@@ -270,7 +278,6 @@ class Step extends Iterable {
     }
 
     const childrenSelectors = []
-    const childrenIndexes = []
     let childrenDepth = 0
 
     for (let i = 0; i < children.length; i++) {
@@ -284,11 +291,13 @@ class Step extends Iterable {
     }
 
     /* istanbul ignore next */
-    await dom.evaluate(
+    const childrenIndexes = await dom.evaluate(
       this.extractor.pageWorker.page,
-      (childrenSelectors, childrenIndexes, childrenDepth) => {
-        [...document.querySelectorAll(childrenSelectors)].map(e => {
-          // Depth must match. TODO (wip)
+      (childrenSelectors, childrenDepth) => {
+        const childrenIndexes = []
+        const children = [...document.querySelectorAll(childrenSelectors)]
+
+        children.map(e => {
           const elDepth = e.getAttribute('data-simple-scraps-depth')
 
           // Debug.
@@ -301,20 +310,34 @@ class Step extends Iterable {
           // Debug.
           console.log(`  depth ${elDepth} = ${childrenDepth} for <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
 
-          const index = e.closest('[data-simple-scraps-multi-field-i]')
-            .getAttribute('data-simple-scraps-multi-field-i')
-          if (index) {
-            childrenIndexes.push(index)
+          if (e.hasAttribute('data-simple-scraps-multi-field-i')) {
+            const index = e.getAttribute('data-simple-scraps-multi-field-i')
+            if (index) {
+              childrenIndexes.push(index)
 
-            // Debug.
-            console.log(`  childrenIndexes[${childrenIndexes.length - 1}] = ${index}`)
+              // Debug.
+              console.log(`  childrenIndexes[${childrenIndexes.length - 1}] = ${index}`)
+            }
+          } else {
+            const index = e.closest('[data-simple-scraps-multi-field-i]')
+              .getAttribute('data-simple-scraps-multi-field-i')
+            if (index) {
+              childrenIndexes.push(index)
+
+              // Debug.
+              console.log(`  childrenIndexes[${childrenIndexes.length - 1}] = ${index}`)
+            }
           }
         })
+
+        return childrenIndexes
       },
       childrenSelectors,
-      childrenIndexes,
       childrenDepth
     )
+
+    // debug.
+    console.log(`  childrenIndexes result = ${childrenIndexes}`)
 
     return childrenIndexes
   }

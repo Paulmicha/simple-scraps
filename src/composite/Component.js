@@ -17,6 +17,10 @@ class Component extends Iterable {
     // this.cid = null
   }
 
+  getDepth () {
+    return this.depth
+  }
+
   getName () {
     const destination = this.as.split('.')
     return destination[1] || this.as

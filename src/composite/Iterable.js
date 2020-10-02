@@ -131,10 +131,6 @@ class Iterable {
     this.depth = 0
   }
 
-  getDepth () {
-    return this.depth
-  }
-
   /**
    * Scope and customize lookup selectors.
    *
