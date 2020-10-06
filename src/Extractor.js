@@ -762,7 +762,7 @@ class Extractor {
       // console.log(`  children.length = ${component.getChildren().length}`)
 
       const children = component.getChildren()
-        .filter(child => JSON.stringify(child.componentsCollection) !== '{}')
+        .filter(child => JSON.stringify(child.getExtractionResult()) !== '{}')
 
       // Nothing to set when there are no children.
       if (!children.length) {
@@ -780,12 +780,12 @@ class Extractor {
       // Debug.
       // for (let i = 0; i < children.length; i++) {
       //   const child = children[i]
-      //   console.log(`    child ${i} = ${child.getName()} = ${JSON.stringify(child.componentsCollection)}`)
-      //   console.log(`    child ${i} = ${child.getName()} (keys : ${Object.keys(child.componentsCollection)})`)
+      //   console.log(`    child ${i} = ${child.getName()} = ${JSON.stringify(child.getExtractionResult())}`)
+      //   console.log(`    child ${i} = ${child.getName()} (keys : ${Object.keys(child.getExtractionResult())})`)
       // }
 
       values = children.map(child => {
-        return { c: child.getName(), props: child.componentsCollection }
+        return { c: child.getName(), props: child.getExtractionResult() }
       })
 
       // Attach a unique ID to be able to determine where they belong, i.e.

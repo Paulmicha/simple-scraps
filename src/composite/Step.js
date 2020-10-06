@@ -268,7 +268,7 @@ class Step extends Iterable {
       return
     }
     const children = component.getChildren()
-      .filter(child => JSON.stringify(child.componentsCollection) !== '{}')
+      .filter(child => JSON.stringify(child.getExtractionResult()) !== '{}')
 
     // Debug.
     // const fieldGroup = this.getMultiFieldName()
