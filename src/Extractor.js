@@ -684,23 +684,75 @@ class Extractor {
 
   /**
    * We need to deal with the possibility of multiple components existing in the
-   * same container, ex: 2 BlockQuotes inside the same Accordion item.
+   * same container at the same depth, ex: 2 BlockQuotes inside the same
+   * Accordion item.
    *
    * If there are several components found, we need a differenciator that
    * will be used to scope all the steps' selectors (which must be run for
    * each instance).
    */
   async preprocess (component) {
-    if (component.getName() === 'BlockQuote') {
+    const selector = component.getSelector()
+    const matchCount = await dom.getCount(this.pageWorker.page, selector)
+
+    // Debug.
+    // console.log(`preprocess() - lv.${component.getDepth()} ${component.getName()} (${component.constructor.name}) <- ${component.getAncestorsChain()}`)
+    // console.log(`  selector : ${component.getSelector()}`)
+
+    if (matchCount > 1) {
+      // this.componentsCollection.remove(component)
+
+      // const container = component.getParentComponent()
+      const classes = await this.differenciate(
+        selector,
+        `lv${component.getDepth()}-${component.getName()}`
+      )
+
+      // Debug.
       console.log(`preprocess() - lv.${component.getDepth()} ${component.getName()} (${component.constructor.name}) <- ${component.getAncestorsChain()}`)
-      console.log(`  selector : ${component.getSelector()}`)
-      const markupMatches = await dom.markup(this.pageWorker.page, component.getSelector())
-      if (Array.isArray(markupMatches)) {
-        console.log(`  matches : ${markupMatches.length}`)
-      } else {
-        console.log(`  1 match (length = ${markupMatches.length})`)
+
+      for (let i = 0; i < classes.length; i++) {
+        const newConfig = { ...component.config }
+        newConfig.selector = classes[i]
+
+        // Debug.
+        console.log(`  new class = ${classes[i]}`)
+
+        // TODO (wip) instanciate the steps here instead of init().
+        // const newComponent = await this.iterableFactory({
+        //   type: 'component',
+        //   config: newConfig
+        // })
+        // container.add(newComponent)
       }
     }
+  }
+
+  /**
+   * Returns an array of generated classes added to all elements matched by
+   * given selector.
+   */
+  async differenciate (selector, prefix) {
+    this.markedElementsCount++
+    const hash = this.hashids.encode(this.markedElementsCount)
+
+    return await dom.evaluate(
+      this.pageWorker.page,
+      (selector, prefix, hash) => {
+        const classes = []
+        const matches = [...document.querySelectorAll(selector)]
+
+        matches.map((item, i) => {
+          classes.push(`${prefix}-${i}-${hash}`)
+          item.classList.add(`${prefix}-${i}-${hash}`)
+        })
+
+        return classes
+      },
+      selector,
+      prefix,
+      hash
+    )
   }
 
   /**

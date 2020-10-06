@@ -215,6 +215,13 @@ const addClass = async (page, selector, CSSClass) => {
 }
 
 /**
+ * Returns the number of matches for given selector.
+ */
+const getCount = async (page, selector) => {
+  return await page.$$eval(selector, matches => matches.length)
+}
+
+/**
  * Returns the first item of an array if it contains only one item, otherwise
  * returns the array.
  */
@@ -238,5 +245,6 @@ module.exports = {
   select,
   selectFirst,
   evaluate,
-  addClass
+  addClass,
+  getCount
 }
