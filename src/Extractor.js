@@ -697,18 +697,16 @@ class Extractor {
     const selector = component.getSelector()
     const matchCount = await dom.getCount(this.pageWorker.page, selector)
 
-    // Debug.
-    // console.log(`preprocess() - lv.${component.getDepth()} ${component.getName()} (${component.constructor.name}) <- ${component.getAncestorsChain()}`)
-    // console.log(`  selector : ${component.getSelector()}`)
-
     if (matchCount < 2) {
       return
     }
 
+    // Debug.
+    console.log(`preprocess() - ${matchCount} matches for lv.${component.getDepth()} ${component.getName()} (${component.constructor.name}) <- ${component.getAncestorsChain()}`)
+    console.log(`  selector : ${component.getSelector()}`)
+
     this.componentsCollection.remove(component)
 
-    // const newComponents = []
-    const container = component.getParentComponent()
     const classes = await this.differenciate(
       selector,
       `lv${component.getDepth()}-${component.getName()}`
@@ -718,31 +716,36 @@ class Extractor {
       return
     }
 
-    // Debug.
-    console.log(`preprocess() - ${matchCount} matches for lv.${component.getDepth()} ${component.getName()} (${component.constructor.name}) <- ${component.getAncestorsChain()}`)
+    const container = component.getParentComponent()
 
     for (let i = 0; i < classes.length; i++) {
-      const newConfig = { ...component.config }
-      newConfig.selector = '.' + classes[i]
+      const config = { ...component.config }
+
+      config.selector = '.' + classes[i]
+      config.component = container
+
+      if ('select' in config) {
+        delete config.select
+      }
 
       const newComponent = await this.iterableFactory({
         type: 'component',
-        config: newConfig
+        config
       })
 
       // Debug.
       // const newComponentSelectorMatchCount = await dom.getCount(this.pageWorker.page, newComponent.getSelector())
       // console.log(`  ${newComponentSelectorMatchCount} for ${classes[i]}`)
+      console.log(`    new selector : ${newComponent.getSelector()}`)
 
       container.add(newComponent)
-      // newComponents.push(newComponent)
       this.componentsCollection.add(newComponent)
 
-      // Redo same process as init()
-      if (Array.isArray(newConfig.extract)) {
-        for (let j = 0; j < newConfig.extract.length; j++) {
-          const subExtractionConfig = newConfig.extract[j]
-          subExtractionConfig.parent = newConfig
+      // Redo same process as init().
+      if (Array.isArray(config.extract)) {
+        for (let j = 0; j < config.extract.length; j++) {
+          const subExtractionConfig = config.extract[j]
+          subExtractionConfig.parent = config
           subExtractionConfig.component = newComponent || container
           const step = await this.iterableFactory({
             type: 'step',
@@ -756,11 +759,11 @@ class Extractor {
       } else {
         const step = await this.iterableFactory({
           type: 'step',
-          newConfig,
+          config,
           newComponent
         })
         if (this.isRecursive && component.getDepth() < this.main.getSetting('maxExtractionNestingDepth')) {
-          await this.nestExtractionConfig(newConfig, component.getDepth(), step)
+          await this.nestExtractionConfig(config, component.getDepth(), step)
         }
       }
     }
@@ -769,28 +772,11 @@ class Extractor {
     // that was replaced by our new components, we need to remove them and
     // replace them with as many steps as previously set during init() - for
     // each new components.
-    // const stepsRemoved = []
     this.stepsIterator.traverse(step => {
       if (step.getComponent() === component) {
-        // stepsRemoved.push(step)
         this.stepsCollection.remove(step)
       }
     })
-    // if (!stepsRemoved.length) {
-    //   return
-    // }
-    // for (let j = 0; j < stepsRemoved.length; j++) {
-    //   const oldStep = stepsRemoved[j]
-
-    //   // Debug.
-    //   // console.log(`  old step = ${oldStep.as} (${oldStep.extract})`)
-
-    //   for (let k = 0; k < newComponents.length; k++) {
-    //     const newStepConfig = oldStep.config
-    //     newStepConfig.component = newComponents[k]
-    //     // await this.init([newStepConfig], oldStep.config.parent, component.getDepth(), oldStep.parentStep)
-    //   }
-    // }
   }
 
   /**
@@ -807,13 +793,19 @@ class Extractor {
         const classes = []
         const matches = [...document.querySelectorAll(selector)]
 
-        matches.map((item, i) => {
-          if (item.classList.contains(alreadyDifferenciatedClass)) {
+        matches.map((e, i) => {
+          if (e.classList.contains(alreadyDifferenciatedClass)) {
+            // Debug.
+            console.log(`  ${i} already diffed <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
+
             return
           }
           classes.push(`${prefix}-${i}-${hash}`)
-          item.classList.add(`${prefix}-${i}-${hash}`)
-          item.classList.add(alreadyDifferenciatedClass)
+          e.classList.add(`${prefix}-${i}-${hash}`)
+          e.classList.add(alreadyDifferenciatedClass)
+
+          // Debug.
+          console.log(`  ${i} <${e.tagName.toLowerCase()} class="${[...e.classList].join(' ')}">`)
         })
 
         return classes
@@ -821,8 +813,8 @@ class Extractor {
       selector,
       prefix,
       hash,
-      // this.alreadyDifferenciatedClass
-      `${prefix}--${this.alreadyDifferenciatedClass}`
+      this.alreadyDifferenciatedClass
+      // `${prefix}--${this.alreadyDifferenciatedClass}`
     )
   }
 
