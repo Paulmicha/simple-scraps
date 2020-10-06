@@ -124,10 +124,10 @@ class Extractor {
     //   steps and extracted collection)
     // - 3 for the component properties (i.e. each "extract" extraction config),
     //   which will populate the initially empty component instance.
-    this.steps = new Collection()
-    this.iterator = this.steps.createIterator()
-    this.extracted = new Collection()
-    this.extractedIterator = this.extracted.createIterator()
+    this.stepsCollection = new Collection()
+    this.stepsIterator = this.stepsCollection.createIterator()
+    this.componentsCollection = new Collection()
+    this.componentsIterator = this.componentsCollection.createIterator()
 
     // Finally, all extracted components will share a single "root" : the HTML
     // document itself. Either we have nested components configs which require
@@ -140,7 +140,7 @@ class Extractor {
     } else {
       this.rootComponent = new Leaf(this, this.rootExtractionConfig)
     }
-    this.extracted.add(this.rootComponent)
+    this.componentsCollection.add(this.rootComponent)
   }
 
   /**
@@ -328,7 +328,7 @@ class Extractor {
 
         // If nothing matches scoped selector, do not add it to the collection.
         if (await instance.selectorExists()) {
-          this.steps.add(instance)
+          this.stepsCollection.add(instance)
         } else {
           // Debug.
           // console.log(`KO iterableFactory(${type}) - lv.${instance.getDepth()} for ${instance.getComponent().getName()}.${instance.getField()}`)
@@ -381,7 +381,7 @@ class Extractor {
           //   }
           // }
 
-          this.extracted.add(instance)
+          this.componentsCollection.add(instance)
 
           // Debug.
           // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
@@ -636,40 +636,40 @@ class Extractor {
     })
 
     // Debug.
-    // console.log(`run() ${this.steps.count()} selectors, ${this.extracted.count()} components.`)
+    // console.log(`run() ${this.stepsCollection.count()} selectors, ${this.componentsCollection.count()} components.`)
     // console.log(`  this.selectorExists = ${JSON.stringify(this.selectorExists, null, 2)}`)
 
     // Debug.
     // console.log('Before sorting :')
-    // this.iterator.traverse(step => step.locate())
+    // this.stepsIterator.traverse(step => step.locate())
 
     // 2. Sort the extraction steps to start from deepest levels.
-    this.iterator.sort()
+    this.stepsIterator.sort()
 
     // Debug.
     // console.log('After sorting :')
-    // this.iterator.traverse(step => step.locate())
+    // this.stepsIterator.traverse(step => step.locate())
 
     // 3. Detect multiple components instances in same scope.
     // TODO actually this should be done before populating the Steps collection.
-    this.extractedIterator.sort()
-    await this.extractedIterator.traverseAsync(
+    this.componentsIterator.sort()
+    await this.componentsIterator.traverseAsync(
       async component => await this.preprocess(component)
     )
 
     // 4. Execute the actual extraction using the pageWorker.
-    await this.iterator.traverseAsync(async step => await this.process(step))
+    await this.stepsIterator.traverseAsync(async step => await this.process(step))
 
     // Debug.
     // console.log('Extracted selectors :')
     // console.log(this.selectorsExtracted)
     // console.log('Extracted components :')
-    // this.extractedIterator.traverse(component => component.locate())
+    // this.componentsIterator.traverse(component => component.locate())
 
     // 5. Generate the extraction result object.
     // When no nested fields were found, we are extracting a single entity from
     // the entire page. Otherwise, the result will need to be built recursively.
-    const exporter = new ExportVisitor(this.extractedIterator)
+    const exporter = new ExportVisitor(this.componentsIterator)
     switch (this.rootComponent.constructor.name) {
       case 'Leaf':
         this.result = exporter.visitLeaf(this.rootComponent)
@@ -762,7 +762,7 @@ class Extractor {
       // console.log(`  children.length = ${component.getChildren().length}`)
 
       const children = component.getChildren()
-        .filter(child => JSON.stringify(child.extracted) !== '{}')
+        .filter(child => JSON.stringify(child.componentsCollection) !== '{}')
 
       // Nothing to set when there are no children.
       if (!children.length) {
@@ -780,12 +780,12 @@ class Extractor {
       // Debug.
       // for (let i = 0; i < children.length; i++) {
       //   const child = children[i]
-      //   console.log(`    child ${i} = ${child.getName()} = ${JSON.stringify(child.extracted)}`)
-      //   console.log(`    child ${i} = ${child.getName()} (keys : ${Object.keys(child.extracted)})`)
+      //   console.log(`    child ${i} = ${child.getName()} = ${JSON.stringify(child.componentsCollection)}`)
+      //   console.log(`    child ${i} = ${child.getName()} (keys : ${Object.keys(child.componentsCollection)})`)
       // }
 
       values = children.map(child => {
-        return { c: child.getName(), props: child.extracted }
+        return { c: child.getName(), props: child.componentsCollection }
       })
 
       // Attach a unique ID to be able to determine where they belong, i.e.
