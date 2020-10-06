@@ -311,10 +311,6 @@ class Extractor {
           await instance.setMultiFieldIndexes()
         }
 
-        // Debug.
-        // console.log(`iterableFactory(${type})`)
-        // instance.locate('  ')
-
         // If this step's component selector differs from this step's and
         // doens't match anything, there's no need to check it.
         const component = instance.getComponent()
@@ -335,7 +331,7 @@ class Extractor {
           this.steps.add(instance)
         } else {
           // Debug.
-          // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} for ${instance.getComponent().getName()}.${instance.getField()}`)
+          // console.log(`KO iterableFactory(${type}) - lv.${instance.getDepth()} for ${instance.getComponent().getName()}.${instance.getField()}`)
           // console.log(`   Step selector not found : ${instance.getSelector()}`)
 
           // Instead, look for a fallback : if it has a selector, it should
@@ -367,6 +363,24 @@ class Extractor {
 
         // If nothing matches scoped selector, do not add it to the collection.
         if (await instance.selectorExists()) {
+          // We need to deal with the possibility of multiple components
+          // existing in the same container, ex: 2 BlockQuotes inside the same
+          // Accordion item.
+          // If there are several components found, we need a differenciator
+          // that will be used to scope all the steps' selectors (which must be
+          // run for each instance).
+          // TODO (wip) debug.
+          // if (config.as === 'component.BlockQuote') {
+          //   console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
+          //   console.log(`  selector : ${instance.getSelector()}`)
+          //   const markupMatches = await dom.markup(this.pageWorker.page, instance.getSelector())
+          //   if (Array.isArray(markupMatches)) {
+          //     console.log(`  matches : ${markupMatches.length}`)
+          //   } else {
+          //     console.log(`  1 match (length = ${markupMatches.length})`)
+          //   }
+          // }
+
           this.extracted.add(instance)
 
           // Debug.
@@ -374,7 +388,7 @@ class Extractor {
           // console.log(`   ${instance.getSelector()}`)
         } else {
           // Debug.
-          // console.log(`iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
+          // console.log(`KO iterableFactory(${type}) - lv.${instance.getDepth()} ${instance.getName()} (${instance.constructor.name}) <- ${instance.getAncestorsChain()}`)
           // console.log(`   Component selector not found : ${instance.getSelector()}`)
 
           // Instead, look for a fallback : if it has a selector, it should
@@ -408,9 +422,9 @@ class Extractor {
     const fallbackConfig = currentConfig.fallback
 
     // Debug.
-    // const component = newComponent || parentComponent
+    const component = newComponent || parentComponent
     // console.log(`createFallbackStep() - ${config.extract} as ${config.as}`)
-    // console.log(`createFallbackStep() - lv.${component.getDepth()} for ${component.getName()}`)
+    console.log(`createFallbackStep() - lv.${component.getDepth()} for ${component.getName()}`)
     // console.log(`  ${config.extract} as ${config.as}`)
     // console.log(`fallbackConfig = ${JSON.stringify(fallbackConfig, null, 2)}`)
 
@@ -507,6 +521,14 @@ class Extractor {
         (destination.length === 2 || container.getName() !== destination[1])) {
         // Debug.
         // console.log(`    Create new component : '${config.as}'`)
+
+        // TODO (wip) :
+        // We need to deal with the possibility of multiple components existing
+        // in the same container, ex: 2 BlockQuotes inside the same Accordion
+        // item.
+        // If there are several components found, we need a differenciator that
+        // will be used to scope all the steps' selectors (which must be run for
+        // each instance).
 
         newComponent = await this.iterableFactory({
           type: 'component',
@@ -628,7 +650,14 @@ class Extractor {
     // console.log('After sorting :')
     // this.iterator.traverse(step => step.locate())
 
-    // 3. Execute the actual extraction using the pageWorker.
+    // 3. Detect multiple components instances in same scope.
+    // TODO actually this should be done before populating the Steps collection.
+    this.extractedIterator.sort()
+    await this.extractedIterator.traverseAsync(
+      async component => await this.preprocess(component)
+    )
+
+    // 4. Execute the actual extraction using the pageWorker.
     await this.iterator.traverseAsync(async step => await this.process(step))
 
     // Debug.
@@ -637,7 +666,7 @@ class Extractor {
     // console.log('Extracted components :')
     // this.extractedIterator.traverse(component => component.locate())
 
-    // 4. Generate the extraction result object.
+    // 5. Generate the extraction result object.
     // When no nested fields were found, we are extracting a single entity from
     // the entire page. Otherwise, the result will need to be built recursively.
     const exporter = new ExportVisitor(this.extractedIterator)
@@ -651,6 +680,27 @@ class Extractor {
     }
 
     return this.result
+  }
+
+  /**
+   * We need to deal with the possibility of multiple components existing in the
+   * same container, ex: 2 BlockQuotes inside the same Accordion item.
+   *
+   * If there are several components found, we need a differenciator that
+   * will be used to scope all the steps' selectors (which must be run for
+   * each instance).
+   */
+  async preprocess (component) {
+    if (component.getName() === 'BlockQuote') {
+      console.log(`preprocess() - lv.${component.getDepth()} ${component.getName()} (${component.constructor.name}) <- ${component.getAncestorsChain()}`)
+      console.log(`  selector : ${component.getSelector()}`)
+      const markupMatches = await dom.markup(this.pageWorker.page, component.getSelector())
+      if (Array.isArray(markupMatches)) {
+        console.log(`  matches : ${markupMatches.length}`)
+      } else {
+        console.log(`  1 match (length = ${markupMatches.length})`)
+      }
+    }
   }
 
   /**
@@ -773,10 +823,6 @@ class Extractor {
     //   - component.MediaGrid.items[].text
     if (step.isMultiField()) {
       await component.setMultiFieldValues(step, values)
-      component.setField(
-        step.getMultiFieldName(),
-        component.getMultiFieldItems(step)
-      )
     } else {
       // Otherwise, set as "normal" component field value.
       component.setField(field, values)
@@ -838,7 +884,7 @@ class Extractor {
    *
    * @param {Step} step instance representing the extraction details of a single
    *   field or prop.
-   * @param {string} selector already scoped and/or transformed in
+   * @param {string} selector already scoped and transformed in
    *   iterableFactory() and process().
    */
   async extract (step, selector) {
@@ -886,12 +932,20 @@ class Extractor {
           step.locate('Error:')
           throw Error(`Missing event for extracting ${step.as}.`)
         }
-        const context = {}
-        const hadListeners = this.main.emit(event, step, context)
+        // The "context" is an object which must be altered by the event
+        // listeners.
+        const context = { step, selector }
+        const hadListeners = this.main.emit(event, context)
         if (!hadListeners) {
           step.locate('Error:')
           throw Error(`Event '${event}' requires at least 1 listener for extracting ${step.as}.`)
         }
+        // There are 2 possibilities when extraction config is set to 'element':
+        // 1. The event listener(s) returns values (which would be the result of
+        // an entirely custom extraction process),
+        // 2. The event listeners return a callback function and (optionally)
+        // a list of arguments, which will be run inside the headless browser,
+        // and which must return the values.
         if ('values' in context) {
           values = context.values
         } else if (context.callback) {
@@ -907,9 +961,11 @@ class Extractor {
 
     // Debug.
     // const component = step.getComponent()
-    // console.log(`extract() lv.${step.getDepth()} ${component.getName()}.${step.getField()}`)
-    // console.log(`  selector = ${selector}`)
-    // console.log(`  values = ${values}`)
+    // if (component.getName() === 'BlockQuote') {
+    //   console.log(`extract() lv.${step.getDepth()} ${component.getName()}.${step.getField()} (${component.constructor.name}) <- ${component.getAncestorsChain()}`)
+    //   console.log(`  selector = ${selector}`)
+    //   console.log(`  values = ${values}`)
+    // }
 
     // if (values && values.length) {
     return values

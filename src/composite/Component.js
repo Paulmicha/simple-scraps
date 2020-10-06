@@ -86,8 +86,8 @@ class Component extends Iterable {
     }
 
     // Debug.
-    console.log(`setMultiFieldValues() : lv.${this.getDepth()} ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)
-    console.log(`  indexes = ${indexes}`)
+    // console.log(`setMultiFieldValues() : lv.${this.getDepth()} ${this.getName()}.${fieldGroup}[].${subField} (${values.length} values)`)
+    // console.log(`  indexes = ${indexes}`)
 
     if (!(fieldGroup in this.multiFieldGroups)) {
       this.multiFieldGroups[fieldGroup] = []
@@ -117,6 +117,9 @@ class Component extends Iterable {
         this.multiFieldValuesSetter(step, fieldGroup, i, subField, values)
       }
     }
+
+    // Finally, update the field containing the multi-filed group itself.
+    this.setField(step.getMultiFieldName(), this.getMultiFieldItems(step))
   }
 
   multiFieldValuesSetter (step, fieldGroup, i, subField, values) {
@@ -134,13 +137,12 @@ class Component extends Iterable {
       this.multiFieldGroups[fieldGroup][i][subField].push(values[i])
 
       // Debug.
-      // console.log(`    PUSH ${JSON.stringify(values[i])}`)
-      console.log(`    ${fieldGroup}[${i}].${subField} PUSH ${values[i]}`)
+      // console.log(`    ${fieldGroup}[${i}].${subField} PUSH ${values[i]}`)
     } else {
       this.multiFieldGroups[fieldGroup][i][subField] = values[i]
 
       // Debug.
-      console.log(`    ${fieldGroup}[${i}].${subField} SET ${values[i]}`)
+      // console.log(`    ${fieldGroup}[${i}].${subField} SET ${values[i]}`)
     }
   }
 

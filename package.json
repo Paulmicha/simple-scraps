@@ -18,13 +18,14 @@
   "devDependencies": {
     "@commitlint/cli": "^10.0.0",
     "@commitlint/config-conventional": "^10.0.0",
-    "ava": "^3.12.1",
+    "ava": "^3.13.0",
     "husky": "^4.2.5",
     "nyc": "^15.1.0",
     "standard": "*"
   },
   "scripts": {
-    "test": "nyc ava"
+    "test": "ava",
+    "coverage": "nyc ava"
   },
   "husky": {
     "hooks": {
