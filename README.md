@@ -51,13 +51,46 @@ const config = require('./data/sessions/www.chouette.net.br.blog.json')
 
 const scraps = new SimpleScraps(config)
 
-const main = async () => {
-  await scraps.init()
-  await scraps.start()
-  await scraps.stop()
-}
+await scraps.run()
+```
 
-main()
+Quick test (without external config file, without writing output to files) :
+
+```js
+const SimpleScraps = require('./src/Main')
+const scraps = new SimpleScraps([
+  {
+    url: 'https://www.test.com',
+    extract: [
+      {
+        selector: 'head title',
+        extract: 'text',
+        // The 'as' key maps the extraction result to the output object
+        // properties. Here, the 'title' prop will contain the text from the
+        // <title> tag in <head>.
+        as: 'entity.title'
+      },
+      {
+        selector: '.blog-sidebar > .p-4:last-child a',
+        extract: 'text_single',
+        as: 'entity.test_plain_text_multi_matches'
+      },
+      {
+        selector: '.blog-footer',
+        extract: 'markup',
+        as: 'entity.test_markup'
+      }
+    ]
+  }
+])
+
+// When this event is listened to, it replaces the default storage process, so
+// nothing will get written to the 'data' folder.
+scraps.on('store.extraction.result', (entity) => {
+  console.log(entity)
+})
+
+await scraps.run()
 ```
 
 For the config file contents (`./data/sessions/www.chouette.net.br.blog.json`), see below :
